@@ -30,6 +30,7 @@ import {
     DialogDescription,
     DialogFooter
 } from "@/components/ui/dialog"
+import { Combobox } from "@/components/ui/combobox"
 
 export default function SalesPage() {
     const { user, isLoading: isAuthLoading } = useAuthStore()
@@ -113,19 +114,15 @@ export default function SalesPage() {
                         <h1 className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-white">Касса</h1>
                         <p className="text-sm text-zinc-500 dark:text-zinc-400">Выберите товары из каталога</p>
                     </div>
-                    <div className="relative w-[320px]">
-                        <div className="absolute inset-0 bg-violet-500/10 blur-xl rounded-full" />
-                        <div className="relative">
-                            <Search className="absolute left-3 top-3 h-4 w-4 text-zinc-400" />
-                            <Input
-                                placeholder="Поиск товара..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-10 h-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-zinc-200 dark:border-zinc-700/50 focus-visible:ring-violet-500 rounded-xl shadow-sm"
-                            />
-                        </div>
-                    </div>
                 </div>
+
+                {/* Product Grid */}
+                {/* Search is now inside the header area or separate? Ah, looks like I removed the search input from header in the snippet above? 
+                   Wait, I should preserve the Search input in the Left Panel. 
+                   The original code had Search input. I must keep it.
+                   Let's target the Receipt Panel specifically for the Combobox change.
+                */}
+
 
                 {/* Product Grid */}
                 <ScrollArea className="flex-1 p-6 pt-2">
@@ -199,32 +196,27 @@ export default function SalesPage() {
                     {/* Client Selector */}
                     <div className="space-y-1">
                         <label className="text-xs font-medium text-zinc-500 ml-1">Клиент</label>
-                        <Select value={selectedClient?.id?.toString() || "anonymous"} onValueChange={(val) => {
-                            if (val === "anonymous") {
-                                setClient(null)
-                            } else {
-                                const client = clients.find(c => c.id.toString() === val)
-                                setClient(client)
-                            }
-                        }}>
-                            <SelectTrigger className="w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 h-10">
-                                <SelectValue placeholder="Выберите клиента" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="anonymous" className="font-medium text-violet-600 dark:text-violet-400">
-                                    👤 Анонимный покупатель
-                                </SelectItem>
-                                <Separator className="my-1" />
-                                {clients.map(c => (
-                                    <SelectItem key={c.id} value={c.id.toString()}>
-                                        {c.name} {c.phone ? `(${c.phone})` : ''}
-                                    </SelectItem>
-                                ))}
-                                <Separator className="my-1" />
-                                {/* Option to clear client only if selected */}
-                                {selectedClient && <SelectItem value="anonymous">Анонимный клиент</SelectItem>}
-                            </SelectContent>
-                        </Select>
+                        <Combobox
+                            options={[
+                                { value: "anonymous", label: "👤 Анонимный покупатель" },
+                                ...clients.map(c => ({
+                                    value: c.id.toString(),
+                                    label: `${c.name} ${c.phone ? `(${c.phone})` : ''}`
+                                }))
+                            ]}
+                            value={selectedClient ? selectedClient.id.toString() : "anonymous"}
+                            onChange={(val) => {
+                                if (val === "anonymous" || !val) {
+                                    setClient(null)
+                                } else {
+                                    const client = clients.find(c => c.id.toString() === val)
+                                    setClient(client)
+                                }
+                            }}
+                            placeholder="Выберите клиента..."
+                            searchPlaceholder="Поиск клиента..."
+                            emptyText="Клиент не найден."
+                        />
                     </div>
                 </div>
 
@@ -271,11 +263,21 @@ export default function SalesPage() {
                                                 </Button>
 
                                                 <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
-                                                    <Button size="icon" variant="ghost" className="h-6 w-6 rounded-md hover:bg-white dark:hover:bg-zinc-700" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md hover:bg-white dark:hover:bg-zinc-700" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
                                                         <Minus className="h-3 w-3" />
                                                     </Button>
-                                                    <span className="w-8 text-center text-xs font-bold tabular-nums">{item.quantity}</span>
-                                                    <Button size="icon" variant="ghost" className="h-6 w-6 rounded-md hover:bg-white dark:hover:bg-zinc-700" onClick={() => addItem(item)}>
+                                                    <Input
+                                                        type="number"
+                                                        value={item.quantity}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value);
+                                                            if (!isNaN(val) && val > 0) {
+                                                                updateQuantity(item.id, val);
+                                                            }
+                                                        }}
+                                                        className="w-12 h-7 p-0 text-center text-xs font-bold bg-transparent border-0 focus-visible:ring-0 shadow-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    />
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md hover:bg-white dark:hover:bg-zinc-700" onClick={() => addItem(item)}>
                                                         <Plus className="h-3 w-3" />
                                                     </Button>
                                                 </div>

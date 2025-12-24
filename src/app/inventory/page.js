@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Search, Loader2, RefreshCcw } from "lucide-react"
 
 import { useAuthStore } from "@/store/authStore"
+import { useProductStore } from "@/store/productStore"
 import api from "@/utils/axios"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +34,22 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from "@/components/ui/sheet"
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Separator } from "@/components/ui/separator"
 
 export default function InventoryPage() {
     const { user, isLoading: isAuthLoading } = useAuthStore()
@@ -57,6 +74,7 @@ export default function InventoryPage() {
     // State for Dialogs
     const [isAddProductOpen, setIsAddProductOpen] = useState(false)
     const [isMoveStockOpen, setIsMoveStockOpen] = useState(false)
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false)
     const [selectedProduct, setSelectedProduct] = useState(null)
 
     // Fetch Products
@@ -129,19 +147,25 @@ export default function InventoryPage() {
                     <p className="text-zinc-500 dark:text-zinc-400">Управление товарами и запасами</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="relative w-full sm:w-[300px]">
+                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 mr-2">
+                        <Button variant="secondary" size="sm" className="bg-white dark:bg-zinc-700 shadow-sm text-xs h-8">Товары</Button>
+                        <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 text-xs h-8" asChild>
+                            <a href="/inventory/history">История</a>
+                        </Button>
+                    </div>
+                    <div className="relative w-full sm:w-[250px]">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-zinc-500" />
                         <Input
                             placeholder="Поиск товара..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="pl-8 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                            className="pl-8 h-10 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                         />
                     </div>
                     {canAddProduct && (
-                        <Button onClick={() => setIsAddProductOpen(true)} className="bg-violet-600 hover:bg-violet-700 text-white">
+                        <Button onClick={() => setIsAddProductOpen(true)} className="bg-violet-600 hover:bg-violet-700 text-white h-10">
                             <Plus className="mr-2 h-4 w-4" />
-                            Добавить товар
+                            Добавить
                         </Button>
                     )}
                 </div>
@@ -189,16 +213,26 @@ export default function InventoryPage() {
                             filteredProducts.map((product) => {
                                 const isLowStock = product.quantity <= product.min_stock_level
                                 return (
-                                    <TableRow key={product.id} className={isLowStock ? "bg-red-50/50 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20" : ""}>
+                                    <TableRow
+                                        key={product.id}
+                                        className={`cursor-pointer transition-colors hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50 ${isLowStock ? "bg-red-50/50 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20" : ""}`}
+                                        onClick={() => {
+                                            setSelectedProduct(product)
+                                            setIsDetailsOpen(true)
+                                        }}
+                                    >
                                         <TableCell className="font-mono text-xs text-zinc-500">#{product.id}</TableCell>
                                         <TableCell className="font-medium text-zinc-950 dark:text-zinc-50">{product.name}</TableCell>
                                         <TableCell>{product.unit}</TableCell>
                                         <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <span className={isLowStock ? "font-bold text-red-600 dark:text-red-400" : ""}>
+                                            <div className="flex items-center gap-3">
+                                                <span className={`text-xl font-black ${isLowStock ? "text-red-600 dark:text-red-400" : "text-zinc-900 dark:text-zinc-100"}`}>
                                                     {product.quantity}
                                                 </span>
-                                                {isLowStock && <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">Мало</Badge>}
+                                                <div className="flex flex-col items-start">
+                                                    {isLowStock && <Badge variant="destructive" className="h-4 px-1 text-[9px] mb-0.5">Low</Badge>}
+                                                    <span className="text-[10px] text-zinc-400 font-medium">Min: {product.min_stock_level}</span>
+                                                </div>
                                             </div>
                                         </TableCell>
                                         {isAdmin && <TableCell>{product.buy_price} ₽</TableCell>}
@@ -208,7 +242,8 @@ export default function InventoryPage() {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
                                                         setSelectedProduct(product)
                                                         setIsMoveStockOpen(true)
                                                     }}
@@ -318,6 +353,216 @@ export default function InventoryPage() {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <ProductDetailsSheet
+                product={selectedProduct}
+                isOpen={isDetailsOpen}
+                onClose={() => setIsDetailsOpen(false)}
+            />
         </div>
+    )
+}
+
+function ProductDetailsSheet({ product, isOpen, onClose }) {
+    const {
+        movements,
+        salesHistory,
+        isLoadingHistory,
+        fetchProductMovements,
+        fetchProductSales,
+        clearHistory
+    } = useProductStore()
+
+    // Fetch data when sheet opens
+    useEffect(() => {
+        if (isOpen && product) {
+            fetchProductMovements(product.id)
+            fetchProductSales(product.id)
+        } else {
+            clearHistory()
+        }
+    }, [isOpen, product, fetchProductMovements, fetchProductSales, clearHistory])
+
+    if (!product) return null
+
+    return (
+        <Sheet open={isOpen} onOpenChange={onClose}>
+            <SheetContent className="w-full sm:max-w-xl p-0 bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800">
+                <div className="h-full flex flex-col">
+                    {/* Header */}
+                    <div className="p-6 pb-2 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+                        <SheetHeader className="space-y-4">
+                            <div>
+                                <Badge variant="outline" className="mb-2 text-zinc-500 border-zinc-300 dark:border-zinc-700">
+                                    #{product.id} • {product.unit}
+                                </Badge>
+                                <SheetTitle className="text-2xl font-black text-zinc-900 dark:text-zinc-50">
+                                    {product.name}
+                                </SheetTitle>
+                            </div>
+                            <div className="flex items-center gap-6">
+                                <div>
+                                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Остаток</p>
+                                    <span className={`text-2xl font-bold ${product.quantity <= product.min_stock_level ? "text-red-500" : "text-emerald-600"}`}>
+                                        {product.quantity}
+                                    </span>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Цена продажи</p>
+                                    <span className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{product.sell_price} с.</span>
+                                </div>
+                                <div className="hidden sm:block">
+                                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Цена закупки</p>
+                                    <span className="text-lg font-medium text-zinc-700 dark:text-zinc-300">{product.buy_price} с.</span>
+                                </div>
+                            </div>
+                        </SheetHeader>
+                    </div>
+
+                    {/* Content */}
+                    <Tabs defaultValue="movements" className="flex-1 flex flex-col overflow-hidden">
+                        <div className="px-6 pt-2">
+                            <TabsList className="w-full justify-start border-b border-zinc-200 dark:border-zinc-800 rounded-none bg-transparent p-0 h-10 gap-6">
+                                <TabsTrigger
+                                    value="movements"
+                                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-violet-600 data-[state=active]:text-violet-600 dark:data-[state=active]:text-violet-400 px-0 pb-2 bg-transparent shadow-none transition-none"
+                                >
+                                    История движений
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="sales"
+                                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-violet-600 data-[state=active]:text-violet-600 dark:data-[state=active]:text-violet-400 px-0 pb-2 bg-transparent shadow-none transition-none"
+                                >
+                                    История продаж
+                                </TabsTrigger>
+                            </TabsList>
+                        </div>
+
+                        {/* MOVEMENTS TAB */}
+                        <TabsContent value="movements" className="flex-1 overflow-hidden p-0 m-0 data-[state=inactive]:hidden">
+                            <ScrollArea className="h-[calc(100vh-250px)]">
+                                <div className="p-6">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="hover:bg-transparent">
+                                                <TableHead className="w-[100px]">Дата</TableHead>
+                                                <TableHead>Тип</TableHead>
+                                                <TableHead>Кол-во</TableHead>
+                                                <TableHead>Автор</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {isLoadingHistory ? (
+                                                Array.from({ length: 5 }).map((_, i) => (
+                                                    <TableRow key={i}>
+                                                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                                                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : movements.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="h-32 text-center text-zinc-400">
+                                                        Нет записей о движениях
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                movements.map((m) => (
+                                                    <TableRow key={m.id}>
+                                                        <TableCell className="text-xs text-zinc-500 font-mono">
+                                                            {new Date(m.created_at).toLocaleDateString('ru-RU')}
+                                                            <div className="text-[10px] opacity-70">
+                                                                {new Date(m.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline" className={
+                                                                m.type === 'in' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                                                    m.type === 'out' ? "bg-red-50 text-red-700 border-red-200" :
+                                                                        "bg-blue-50 text-blue-700 border-blue-200"
+                                                            }>
+                                                                {m.type === 'in' ? "Приход" : m.type === 'out' ? "Расход" : "Корр."}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="font-bold text-sm">
+                                                            {m.type === 'out' ? '-' : '+'}{m.change_amount}
+                                                        </TableCell>
+                                                        <TableCell className="text-xs text-zinc-600">
+                                                            {m.performed_by_name || "-"}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </ScrollArea>
+                        </TabsContent>
+
+                        {/* SALES TAB */}
+                        <TabsContent value="sales" className="flex-1 overflow-hidden p-0 m-0 data-[state=inactive]:hidden">
+                            <ScrollArea className="h-[calc(100vh-250px)]">
+                                <div className="p-6">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="hover:bg-transparent">
+                                                <TableHead>Дата</TableHead>
+                                                <TableHead>Клиент</TableHead>
+                                                <TableHead className="text-right">Кол-во</TableHead>
+                                                <TableHead className="text-right">Сумма</TableHead>
+                                                <TableHead className="text-right">Продавец</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {isLoadingHistory ? (
+                                                Array.from({ length: 5 }).map((_, i) => (
+                                                    <TableRow key={i}>
+                                                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                                                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : salesHistory.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="h-32 text-center text-zinc-400">
+                                                        Нет продаж этого товара
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                salesHistory.map((s) => (
+                                                    <TableRow key={s.sale_id}>
+                                                        <TableCell className="text-xs text-zinc-500 font-mono">
+                                                            {new Date(s.sale_date).toLocaleDateString('ru-RU')}
+                                                            <div className="text-[10px] opacity-70">
+                                                                {new Date(s.sale_date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-sm font-medium">
+                                                            {s.client_name || "Аноним"}
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-bold text-sm">
+                                                            {s.quantity}
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-xs text-zinc-600">
+                                                            {s.total} c.
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-xs text-zinc-500">
+                                                            {s.seller_name || "-"}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </ScrollArea>
+                        </TabsContent>
+                    </Tabs>
+                </div>
+            </SheetContent>
+        </Sheet>
     )
 }
