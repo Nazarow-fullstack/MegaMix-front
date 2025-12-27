@@ -142,7 +142,7 @@ export default function ClientsPage() {
                             <TableHead className="w-[80px]">ID</TableHead>
                             <TableHead>Имя</TableHead>
                             <TableHead>Телефон</TableHead>
-                            <TableHead>Баланс</TableHead>
+                            <TableHead>Долг</TableHead>
                             {canEdit && <TableHead className="text-right">Действия</TableHead>}
                         </TableRow>
                     </TableHeader>

@@ -87,7 +87,7 @@ export default function ExpensesPage() {
         setIsSubmitting(true)
         const payload = {
             amount: parseFloat(formData.amount),
-            category: formData.category,
+            category: formData.category.toLowerCase(),
             description: formData.description || ""
         }
 
@@ -208,7 +208,7 @@ export default function ExpensesPage() {
                             </TableHeader>
                             <TableBody>
                                 {expenses.map((expense) => {
-                                    const categoryInfo = EXPENSE_CATEGORIES[expense.category] || { label: expense.category, color: "bg-gray-500" }
+                                    const categoryInfo = EXPENSE_CATEGORIES[(expense.category || "").toUpperCase()] || { label: expense.category, color: "bg-gray-500" }
 
                                     return (
                                         <TableRow key={expense.id}>
