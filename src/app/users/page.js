@@ -431,8 +431,8 @@ export default function UsersPage() {
 
             {/* User Details Sheet */}
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetContent>
-                    <SheetHeader>
+                <SheetContent className="sm:max-w-2xl">
+                    <SheetHeader className="pr-10">
                         <SheetTitle>Детали пользователя</SheetTitle>
                         <SheetDescription>
                             Информация профиля и безопасность.

@@ -1,34 +1,23 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Search, Loader2, ShoppingCart, Trash2, Plus, Minus, CreditCard, RefreshCcw, User, Wallet } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Search, Loader2, ShoppingCart, Trash2, Plus, Minus, CreditCard, RefreshCcw, User, Wallet, Grid } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 import { useAuthStore } from "@/store/authStore"
 import { useCartStore } from "@/store/cartStore"
-import api from "@/utils/axios"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogDescription,
-    DialogFooter
+    DialogDescription
 } from "@/components/ui/dialog"
 import { Combobox } from "@/components/ui/combobox"
 
@@ -44,14 +33,21 @@ export default function SalesPage() {
         getTotal,
         getTotalItems,
         checkout,
-        isCheckingOut
+        isCheckingOut,
+        products,
+        clients,
+        isLoadingData,
+        fetchCatalog
     } = useCartStore()
 
-    const queryClient = useQueryClient()
-
+    const [mobileTab, setMobileTab] = useState("catalog") // 'catalog' | 'cart'
     const [search, setSearch] = useState("")
     const [paidAmount, setPaidAmount] = useState("")
-    const [checkoutResult, setCheckoutResult] = useState(null) // { success: boolean, message: string }
+    const [checkoutResult, setCheckoutResult] = useState(null)
+
+    useEffect(() => {
+        fetchCatalog()
+    }, [fetchCatalog])
 
     // Hydration Guard
     if (!user || isAuthLoading) {
@@ -62,146 +58,166 @@ export default function SalesPage() {
         );
     }
 
-    // Fetch Products
-    const { data: products = [], isLoading: isProductsLoading } = useQuery({
-        queryKey: ['products'],
-        queryFn: async () => {
-            const res = await api.get('/api/inventory/products', { params: { skip: 0, limit: 100 } })
-            return res.data
-        }
-    })
-
-    // Fetch Clients
-    const { data: clients = [] } = useQuery({
-        queryKey: ['clients'],
-        queryFn: async () => {
-            try {
-                const res = await api.get('/api/clients/clients')
-                return res.data
-            } catch (e) {
-                console.warn("Clients fetch failed (API might be missing)", e)
-                return []
-            }
-        }
-    })
-
-    // Filter Products
     const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(search.toLowerCase())
     )
 
-    // Handle Checkout
     const handleCheckout = async () => {
         const result = await checkout(paidAmount || getTotal());
         if (result.success) {
             setCheckoutResult({ success: true, message: "Продажа успешно оформлена!" });
             setPaidAmount("");
-            queryClient.invalidateQueries(['products']);
         } else {
             setCheckoutResult({ success: false, message: result.error });
         }
     }
 
+    const totalMoney = getTotal();
+    const totalItemsCount = getTotalItems();
+
     return (
-        <div className="flex h-[calc(100vh-1rem)] flex-col gap-4 lg:flex-row overflow-hidden bg-zinc-50 dark:bg-zinc-950 p-2">
+        <div className="flex flex-col h-[calc(100vh-3rem)] lg:flex-row gap-4 overflow-hidden bg-zinc-50 dark:bg-zinc-950 p-2 lg:p-4">
 
-            {/* ================= LEFT PANEL: CATALOG (70%) ================= */}
-            <div className="flex flex-[7] flex-col gap-4 overflow-hidden rounded-2xl bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm relative">
+            {/* Mobile Tab Switcher */}
+            <div className="lg:hidden flex w-full bg-zinc-100 dark:bg-zinc-900 rounded-lg p-1 shrink-0 mb-2">
+                <button
+                    onClick={() => setMobileTab("catalog")}
+                    className={`flex-1 py-2 text-sm font-medium rounded-md transition-all flex items-center justify-center ${mobileTab === "catalog"
+                        ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                        }`}
+                >
+                    <Grid className="w-4 h-4 mr-2" />
+                    Товары
+                </button>
+                <button
+                    onClick={() => setMobileTab("cart")}
+                    className={`flex-1 py-2 text-sm font-medium rounded-md transition-all flex items-center justify-center ${mobileTab === "cart"
+                        ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                        }`}
+                >
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    Корзина ({totalItemsCount})
+                </button>
+            </div>
 
-                {/* Header & Search */}
-                <div className="flex items-center justify-between p-6 pb-2 z-10">
+            {/* CATALOG PANEL */}
+            <div className={`
+                flex-[7] flex-col gap-4 overflow-hidden rounded-2xl bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm relative transition-all
+                ${mobileTab === 'catalog' ? 'flex h-full' : 'hidden'} 
+                lg:flex
+            `}>
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-6 pb-2 sm:pb-4 z-10 gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-zinc-950 dark:text-white">Касса</h1>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400">Выберите товары из каталога</p>
+                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-950 dark:text-white">Касса</h1>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400">Каталог товаров</p>
+                    </div>
+                    <div className="relative w-full sm:w-72">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                        <Input
+                            placeholder="Поиск товара..."
+                            className="pl-9 bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
                     </div>
                 </div>
 
-                {/* Product Grid */}
-                {/* Search is now inside the header area or separate? Ah, looks like I removed the search input from header in the snippet above? 
-                   Wait, I should preserve the Search input in the Left Panel. 
-                   The original code had Search input. I must keep it.
-                   Let's target the Receipt Panel specifically for the Combobox change.
-                */}
-
-
-                {/* Product Grid */}
-                <ScrollArea className="flex-1 p-6 pt-2">
-                    {isProductsLoading ? (
-                        <div className="flex h-full items-center justify-center text-zinc-500 animate-pulse">
+                {/* Products Grid */}
+                <ScrollArea className="flex-1 p-3 sm:p-6 pt-2">
+                    {isLoadingData ? (
+                        <div className="flex h-64 items-center justify-center text-zinc-500 animate-pulse">
                             <Loader2 className="mr-2 h-6 w-6 animate-spin text-violet-500" />
                             Загрузка каталога...
                         </div>
                     ) : filteredProducts.length === 0 ? (
-                        <div className="flex h-[400px] flex-col items-center justify-center text-zinc-400 opacity-50">
+                        <div className="flex h-64 flex-col items-center justify-center text-zinc-400 opacity-50">
                             <RefreshCcw className="mb-4 h-12 w-12" />
                             <p className="text-lg font-medium">Товары не найдены</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 pb-20">
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4 pb-20 lg:pb-0">
                             {filteredProducts.map(product => {
-                                const isLowStock = product.quantity <= 5;
                                 const isOutOfStock = product.quantity <= 0;
+                                const isLowStock = product.quantity <= 5;
                                 return (
-                                    <motion.div
+                                    <div
                                         key={product.id}
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ duration: 0.2 }}
+                                        className={`group relative overflow-hidden rounded-xl border bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-950 transition-all active:scale-95 cursor-pointer flex flex-col
+                                            ${isOutOfStock ? 'opacity-60 grayscale border-zinc-200' : 'border-zinc-200 dark:border-zinc-800 hover:border-violet-500/50 hover:shadow-lg'}
+                                        `}
+                                        onClick={() => !isOutOfStock && addItem(product)}
                                     >
-                                        <Card className={`group relative overflow-hidden border-0 bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-950 hover:shadow-xl hover:shadow-violet-500/10 transition-all duration-300 ring-1 ring-zinc-200 dark:ring-zinc-800 hover:ring-violet-500/50 cursor-pointer ${isOutOfStock ? 'opacity-60 grayscale' : ''}`}
-                                            onClick={() => !isOutOfStock && addItem(product)}
-                                        >
-                                            <CardHeader className="p-4 pb-2 space-y-2">
-                                                <div className="flex justify-between items-start">
-                                                    <Badge variant="secondary" className="bg-zinc-200/50 dark:bg-zinc-800/50 text-xs font-normal text-zinc-600 dark:text-zinc-400">
-                                                        {product.unit}
-                                                    </Badge>
-                                                    <Badge className={isOutOfStock ? "bg-red-500/10 text-red-500 hover:bg-red-500/20" : isLowStock ? "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20" : "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"}>
-                                                        {product.quantity} шт
-                                                    </Badge>
+                                        <div className="p-3 sm:p-4 space-y-2 flex-grow">
+                                            <div className="flex justify-between items-start">
+                                                <Badge variant="secondary" className="bg-white/50 dark:bg-zinc-800/50 text-[10px] sm:text-xs px-1.5 py-0">
+                                                    {product.unit}
+                                                </Badge>
+                                                <Badge className={`text-[10px] sm:text-xs px-1.5 py-0 ${isOutOfStock ? "bg-red-100 text-red-600" : isLowStock ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"}`}>
+                                                    {product.quantity}
+                                                </Badge>
+                                            </div>
+                                            <h3 className="line-clamp-2 text-xs sm:text-sm font-medium h-8 sm:h-10 text-zinc-700 dark:text-zinc-200 leading-snug">
+                                                {product.name}
+                                            </h3>
+                                        </div>
+                                        <div className="p-3 sm:p-4 pt-0 flex items-end justify-between bg-white/50 dark:bg-zinc-900/50">
+                                            <div>
+                                                <div className="text-sm sm:text-lg font-bold text-zinc-900 dark:text-white">
+                                                    {product.sell_price} <span className="text-[10px] sm:text-xs font-normal text-zinc-500">c.</span>
                                                 </div>
-                                                <CardTitle className="line-clamp-2 text-sm font-medium leading-normal h-10 text-zinc-700 dark:text-zinc-200 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
-                                                    {product.name}
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardFooter className="p-4 pt-1 flex items-end justify-between">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Цена</span>
-                                                    <span className="text-xl font-bold text-zinc-900 dark:text-white">{product.sell_price} <span className="text-sm font-normal text-zinc-500">c.</span></span>
-                                                </div>
-                                                <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 hover:bg-violet-600 hover:text-white transition-colors">
-                                                    <Plus className="h-4 w-4" />
-                                                </Button>
-                                            </CardFooter>
-                                        </Card>
-                                    </motion.div>
+                                            </div>
+                                            <Button size="icon" className="h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-violet-100 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 hover:bg-violet-600 hover:text-white shadow-none">
+                                                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
                                 );
                             })}
                         </div>
                     )}
                 </ScrollArea>
-                <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-zinc-950 to-transparent pointer-events-none" />
+
+                {/* Mobile Floating Footer - Only visible on Mobile when items > 0 */}
+                <div className={`lg:hidden absolute bottom-4 left-4 right-4 z-20 transition-transform duration-300 ${totalItemsCount > 0 ? 'translate-y-0' : 'translate-y-[200%]'}`}>
+                    <Button
+                        onClick={() => setMobileTab("cart")}
+                        className="w-full h-14 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xl flex justify-between items-center px-6 active:scale-95 transition-transform"
+                    >
+                        <span className="flex items-center">
+                            <span className="bg-white/20 dark:bg-black/10 px-2 py-0.5 rounded text-xs mr-3 font-mono">{totalItemsCount}</span>
+                            <span>Перейти к оплате</span>
+                        </span>
+                        <span className="font-bold text-lg">{totalMoney.toFixed(0)} c.</span>
+                    </Button>
+                </div>
+
+                {/* Desktop Gradient Fade */}
+                <div className="hidden lg:block absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-zinc-950 to-transparent pointer-events-none" />
             </div>
 
-            {/* ================= RIGHT PANEL: RECEIPT (30%) ================= */}
-            <div className="flex flex-[3] flex-col rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden relative">
-
-                {/* Receipt Header */}
+            {/* RECEIPT PANEL */}
+            <div className={`
+                flex-[3] flex-col rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden
+                ${mobileTab === 'cart' ? 'flex h-full' : 'hidden'}
+                lg:flex
+            `}>
+                {/* Header */}
                 <div className="p-4 bg-zinc-50 dark:bg-zinc-900/40 border-b border-zinc-200 dark:border-zinc-800 space-y-3">
                     <div className="flex items-center gap-2 text-zinc-400 text-xs uppercase tracking-widest font-bold">
-                        <ShoppingCart className="h-3 w-3" />
+                        <Wallet className="h-3 w-3" />
                         Ваш чек
                     </div>
-
                     {/* Client Selector */}
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-zinc-500 ml-1">Клиент</label>
                         <Combobox
                             options={[
                                 { value: "anonymous", label: "👤 Анонимный покупатель" },
                                 ...clients.map(c => ({
                                     value: c.id.toString(),
-                                    label: `${c.name} ${c.phone ? `(${c.phone})` : ''}`
+                                    label: `${c.full_name} ${c.phone ? `(${c.phone})` : ''}`
                                 }))
                             ]}
                             value={selectedClient ? selectedClient.id.toString() : "anonymous"}
@@ -214,16 +230,16 @@ export default function SalesPage() {
                                 }
                             }}
                             placeholder="Выберите клиента..."
-                            searchPlaceholder="Поиск клиента..."
+                            searchPlaceholder="Поиск..."
                             emptyText="Клиент не найден."
                         />
                     </div>
                 </div>
 
-                {/* Cart Items List */}
+                {/* List */}
                 <div className="flex-1 overflow-hidden relative bg-zinc-50/30 dark:bg-zinc-900/20">
                     <ScrollArea className="h-full p-4">
-                        <AnimatePresence initial={false}>
+                        <AnimatePresence mode="popLayout">
                             {items.length === 0 ? (
                                 <motion.div
                                     initial={{ opacity: 0 }}
@@ -234,17 +250,16 @@ export default function SalesPage() {
                                         <ShoppingCart className="h-8 w-8 text-zinc-300 dark:text-zinc-700" />
                                     </div>
                                     <p className="text-zinc-500 font-medium">Корзина пуста</p>
-                                    <p className="text-xs text-zinc-400 mt-1 max-w-[150px]">Добавьте товары из каталога чтобы начать</p>
                                 </motion.div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-3 pb-20 lg:pb-0">
                                     {items.map(item => (
                                         <motion.div
                                             key={item.id}
                                             layout
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, x: -50 }}
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
                                             className="group flex flex-col gap-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-3 shadow-sm hover:border-violet-500/30 transition-colors"
                                         >
                                             <div className="flex justify-between items-start">
@@ -258,26 +273,34 @@ export default function SalesPage() {
                                             <Separator className="bg-zinc-100 dark:bg-zinc-800" />
 
                                             <div className="flex items-center justify-between">
-                                                <Button size="icon" variant="ghost" className="h-6 w-6 text-zinc-400 hover:text-red-500" onClick={() => removeItem(item.id)}>
-                                                    <Trash2 className="h-3 w-3" />
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => removeItem(item.id)}>
+                                                    <Trash2 className="h-4 w-4" />
                                                 </Button>
 
                                                 <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
-                                                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md hover:bg-white dark:hover:bg-zinc-700" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
                                                         <Minus className="h-3 w-3" />
                                                     </Button>
                                                     <Input
                                                         type="number"
                                                         value={item.quantity}
                                                         onChange={(e) => {
-                                                            const val = parseInt(e.target.value);
-                                                            if (!isNaN(val) && val > 0) {
-                                                                updateQuantity(item.id, val);
+                                                            const val = e.target.value;
+                                                            if (val === "") return; // Allow empty while typing
+                                                            const num = parseInt(val);
+                                                            if (!isNaN(num) && num > 0) {
+                                                                updateQuantity(item.id, num);
                                                             }
                                                         }}
-                                                        className="w-12 h-7 p-0 text-center text-xs font-bold bg-transparent border-0 focus-visible:ring-0 shadow-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                        onBlur={(e) => {
+                                                            // Reset to 1 if user leaves it empty or 0
+                                                            if (!e.target.value || parseInt(e.target.value) <= 0) {
+                                                                updateQuantity(item.id, 1);
+                                                            }
+                                                        }}
+                                                        className="w-12 h-7 p-0 text-center text-sm font-bold bg-transparent border-0 focus-visible:ring-0 shadow-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                     />
-                                                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md hover:bg-white dark:hover:bg-zinc-700" onClick={() => addItem(item)}>
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => addItem(item)}>
                                                         <Plus className="h-3 w-3" />
                                                     </Button>
                                                 </div>
@@ -291,16 +314,12 @@ export default function SalesPage() {
                     <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-white dark:from-zinc-950 to-transparent pointer-events-none" />
                 </div>
 
-                {/* Receipt Footer */}
+                {/* Footer */}
                 <div className="bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 p-6 z-20 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
                     <div className="space-y-1 mb-6">
-                        <div className="flex justify-between text-sm text-zinc-500">
-                            <span>Товаров</span>
-                            <span>{getTotalItems()} шт.</span>
-                        </div>
                         <div className="flex justify-between items-baseline">
-                            <span className="text-base font-semibold text-zinc-700 dark:text-zinc-300">Итого к оплате</span>
-                            <span className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">{getTotal().toFixed(0)} <span className="text-lg font-normal text-zinc-400">c.</span></span>
+                            <span className="text-base font-semibold text-zinc-700 dark:text-zinc-300">Итого</span>
+                            <span className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">{totalMoney.toFixed(0)} <span className="text-lg font-normal text-zinc-400">c.</span></span>
                         </div>
                     </div>
 
@@ -310,47 +329,41 @@ export default function SalesPage() {
                             <Input
                                 type="number"
                                 placeholder="Получено от клиента..."
-                                className="pl-10 h-11 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 focus-visible:ring-emerald-500 font-medium"
+                                className="pl-10 h-11 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 font-medium"
                                 value={paidAmount}
                                 onChange={(e) => setPaidAmount(e.target.value)}
                             />
                         </div>
                         <Button
-                            className="w-full h-12 text-lg font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98]"
+                            className="w-full h-12 text-lg font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all"
                             onClick={() => {
                                 const total = getTotal();
                                 const currentPaid = paidAmount ? Number(paidAmount) : total;
 
-                                // Validation: Anonymous users cannot have debt
                                 if (!selectedClient && currentPaid < total) {
                                     setCheckoutResult({
                                         success: false,
-                                        message: "Анонимный покупатель должен оплатить полную стоимость заказа."
+                                        message: "Анонимный покупатель должен оплатить полную стоимость."
                                     });
                                     return;
                                 }
-
                                 if (items.length > 0) handleCheckout();
                             }}
                             disabled={isCheckingOut || items.length === 0}
                         >
                             {isCheckingOut ? (
-                                <>
-                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                    Оформление...
-                                </>
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                             ) : (
-                                <>
-                                    <CreditCard className="mr-2 h-5 w-5" />
-                                    Оплатить
-                                </>
+                                <CreditCard className="mr-2 h-5 w-5" />
                             )}
+                            Оплатить
                         </Button>
                     </div>
                 </div>
+
             </div>
 
-            {/* Success/Error Dialog */}
+            {/* Result Dialog */}
             <Dialog open={!!checkoutResult} onOpenChange={() => setCheckoutResult(null)}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>

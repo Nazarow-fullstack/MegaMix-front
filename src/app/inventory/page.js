@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Search, Loader2, RefreshCcw } from "lucide-react"
+import { Plus, Search, Loader2, RefreshCcw, Pencil, Trash } from "lucide-react"
 
 import { useAuthStore } from "@/store/authStore"
 import { useProductStore } from "@/store/productStore"
@@ -25,6 +25,16 @@ import {
     DialogTrigger,
     DialogFooter,
 } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
     Select,
     SelectContent,
@@ -69,13 +79,24 @@ export default function InventoryPage() {
     const isManager = user?.role === "manager"
     const canSeePrices = isAdmin || isManager
     const canAddProduct = isAdmin
-    const canMoveStock = isAdmin || isManager
+    // Allow everyone to see movement button (Worker requirement), but restrict Edit/Delete to Manager/Admin
+    const canMoveStock = true
+    const canManage = isAdmin || isManager
 
     // State for Dialogs
     const [isAddProductOpen, setIsAddProductOpen] = useState(false)
     const [isMoveStockOpen, setIsMoveStockOpen] = useState(false)
+    const [isEditOpen, setIsEditOpen] = useState(false)
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false)
     const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+
+    // Selection State
     const [selectedProduct, setSelectedProduct] = useState(null)
+    const [productToDelete, setProductToDelete] = useState(null)
+    const [productToEdit, setProductToEdit] = useState(null)
+
+    // Store Actions
+    const { updateProduct, deleteProduct } = useProductStore()
 
     // Fetch Products
     const { data: products = [], isLoading, isError } = useQuery({
@@ -113,6 +134,28 @@ export default function InventoryPage() {
         }
     })
 
+    const updateProductMutation = useMutation({
+        mutationFn: async (data) => {
+            await updateProduct(productToEdit.id, data)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['products'])
+            setIsEditOpen(false)
+            setProductToEdit(null)
+        }
+    })
+
+    const deleteProductMutation = useMutation({
+        mutationFn: async (id) => {
+            await deleteProduct(id)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['products'])
+            setIsDeleteOpen(false)
+            setProductToDelete(null)
+        }
+    })
+
     // Handlers
     const handleAddProduct = (e) => {
         e.preventDefault()
@@ -136,6 +179,34 @@ export default function InventoryPage() {
             change_amount: parseFloat(formData.get("quantity")),
             comment: String(formData.get("comment") || ""),
         })
+    }
+
+    const handleEdit = (product) => {
+        setProductToEdit(product)
+        setIsEditOpen(true)
+    }
+
+    const handleUpdateProduct = (e) => {
+        e.preventDefault()
+        const formData = new FormData(e.target)
+        updateProductMutation.mutate({
+            name: formData.get("name"),
+            unit: formData.get("unit"),
+            buy_price: parseFloat(formData.get("buy_price") || 0),
+            sell_price: parseFloat(formData.get("sell_price") || 0),
+            min_stock_level: parseInt(formData.get("min_stock_level") || 0),
+        })
+    }
+
+    const handleDelete = (product) => {
+        setProductToDelete(product)
+        setIsDeleteOpen(true)
+    }
+
+    const confirmDelete = () => {
+        if (productToDelete) {
+            deleteProductMutation.mutate(productToDelete.id)
+        }
     }
 
     return (
@@ -237,21 +308,45 @@ export default function InventoryPage() {
                                         </TableCell>
                                         {isAdmin && <TableCell>{product.buy_price} ₽</TableCell>}
                                         {canSeePrices && <TableCell>{product.sell_price} ₽</TableCell>}
-                                        <TableCell className="text-right">
-                                            {canMoveStock && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        setSelectedProduct(product)
-                                                        setIsMoveStockOpen(true)
-                                                    }}
-                                                    title="Движение товара"
-                                                >
-                                                    <Plus className="h-4 w-4" />
-                                                </Button>
-                                            )}
+                                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex items-center justify-end gap-1">
+                                                {canMoveStock && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => {
+                                                            setSelectedProduct(product)
+                                                            setIsMoveStockOpen(true)
+                                                        }}
+                                                        title="Движение товара"
+                                                        className="h-8 w-8 text-zinc-500 hover:text-zinc-900"
+                                                    >
+                                                        <Plus className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                {(isAdmin || isManager) && (
+                                                    <>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleEdit(product)}
+                                                            title="Редактировать"
+                                                            className="h-8 w-8 text-zinc-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => handleDelete(product)}
+                                                            title="Удалить"
+                                                            className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"
+                                                        >
+                                                            <Trash className="h-4 w-4" />
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 )
@@ -354,12 +449,92 @@ export default function InventoryPage() {
                 </DialogContent>
             </Dialog>
 
+            {/* Edit Product Dialog */}
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent className="sm:max-w-[425px] bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+                    <DialogHeader>
+                        <DialogTitle>Редактировать товар</DialogTitle>
+                    </DialogHeader>
+                    {productToEdit && (
+                        <form onSubmit={handleUpdateProduct}>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="edit-name">Название</Label>
+                                    <Input id="edit-name" name="name" defaultValue={productToEdit.name} required className="bg-zinc-50 dark:bg-zinc-900" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="edit-unit">Ед. изм.</Label>
+                                        <Select name="unit" defaultValue={productToEdit.unit}>
+                                            <SelectTrigger className="bg-zinc-50 dark:bg-zinc-900">
+                                                <SelectValue placeholder="Unit" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="шт">шт</SelectItem>
+                                                <SelectItem value="кг">кг</SelectItem>
+                                                <SelectItem value="л">л</SelectItem>
+                                                <SelectItem value="м">м</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="edit-min_stock_level">Мин. остаток</Label>
+                                        <Input id="edit-min_stock_level" name="min_stock_level" type="number" defaultValue={productToEdit.min_stock_level} className="bg-zinc-50 dark:bg-zinc-900" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="edit-buy_price">Цена закупки</Label>
+                                        <Input id="edit-buy_price" name="buy_price" type="number" step="0.01" defaultValue={productToEdit.buy_price} className="bg-zinc-50 dark:bg-zinc-900" />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="edit-sell_price">Цена продажи</Label>
+                                        <Input id="edit-sell_price" name="sell_price" type="number" step="0.01" defaultValue={productToEdit.sell_price} className="bg-zinc-50 dark:bg-zinc-900" />
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button type="submit" disabled={updateProductMutation.isPending} className="bg-violet-600 hover:bg-violet-700 text-white">
+                                    {updateProductMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Сохранить
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Alert */}
+            <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+                <AlertDialogContent className="bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Это действие нельзя отменить. Товар <b>{productToDelete?.name}</b> будет удален из базы данных навсегда.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Отмена</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault()
+                                confirmDelete()
+                            }}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                            disabled={deleteProductMutation.isPending}
+                        >
+                            {deleteProductMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Удалить"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             <ProductDetailsSheet
                 product={selectedProduct}
                 isOpen={isDetailsOpen}
                 onClose={() => setIsDetailsOpen(false)}
             />
-        </div>
+        </div >
     )
 }
 

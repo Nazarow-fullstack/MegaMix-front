@@ -29,5 +29,42 @@ export const useProductStore = create((set) => ({
         }
     },
 
-    clearHistory: () => set({ movements: [], salesHistory: [], error: null })
+    updateProduct: async (id, data) => {
+        try {
+            await api.put(`/api/inventory/products/${id}`, data);
+        } catch (error) {
+            console.error("Failed to update product", error);
+            throw error;
+        }
+    },
+
+    deleteProduct: async (id) => {
+        try {
+            await api.delete(`/api/inventory/products/${id}`);
+        } catch (error) {
+            console.error("Failed to delete product", error);
+            throw error;
+        }
+    },
+
+    clearHistory: () => set({ movements: [], salesHistory: [], error: null }),
+
+    updateProduct: async (id, data) => {
+        try {
+            await api.put(`/api/inventory/products/${id}`, data);
+            // Optionally fetch products here if the component doesn't invalidate queries
+        } catch (error) {
+            console.error("Failed to update product", error);
+            throw error;
+        }
+    },
+
+    deleteProduct: async (id) => {
+        try {
+            await api.delete(`/api/inventory/products/${id}`);
+        } catch (error) {
+            console.error("Failed to delete product", error);
+            throw error;
+        }
+    }
 }));
