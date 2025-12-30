@@ -54,7 +54,7 @@ export default function ClientsPage() {
     const queryClient = useQueryClient()
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
-    const limit = 20
+    const limit = 10
 
     // Dialog & Sheet States
     const [isCreateOpen, setIsCreateOpen] = useState(false)

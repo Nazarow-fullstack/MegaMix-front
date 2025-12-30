@@ -70,7 +70,7 @@ export default function ExpensesPage() {
     })
     const [formError, setFormError] = useState(null)
     const [page, setPage] = useState(1)
-    const limit = 20
+    const limit = 10
 
     // Initial Fetch
     useEffect(() => {

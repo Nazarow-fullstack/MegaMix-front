@@ -67,7 +67,7 @@ export default function InventoryPage() {
     const queryClient = useQueryClient()
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
-    const limit = 20
+    const limit = 10
 
     if (!user || isAuthLoading) {
         return (
