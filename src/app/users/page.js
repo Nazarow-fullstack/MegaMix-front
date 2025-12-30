@@ -431,47 +431,54 @@ export default function UsersPage() {
 
             {/* User Details Sheet */}
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetContent className="sm:max-w-2xl">
+                <SheetContent className="w-full sm:w-[540px]">
                     <SheetHeader className="pr-10">
                         <SheetTitle>Детали пользователя</SheetTitle>
                         <SheetDescription>
-                            Информация профиля и безопасность.
+                            Полная информация о сотруднике и управление доступом.
                         </SheetDescription>
                     </SheetHeader>
 
                     {selectedUser && (
-                        <div className="mt-6 space-y-6">
+                        <div className="mt-8 flex flex-col gap-6 px-6">
                             {/* User Header */}
-                            <div className="flex items-center gap-4">
-                                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                                    <User className="h-8 w-8" />
+                            <div className="flex items-center gap-5">
+                                <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center text-muted-foreground shrink-0 border">
+                                    <User className="h-10 w-10" />
                                 </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold">{selectedUser.username}</h3>
-                                    <Badge className={cn("mt-1", ROLE_COLORS[selectedUser.role?.toLowerCase()] || "bg-gray-500")}>
-                                        {ROLE_LABELS[selectedUser.role?.toLowerCase()] || selectedUser.role}
-                                    </Badge>
+                                <div className="space-y-1.5">
+                                    <h3 className="text-2xl font-bold text-foreground">{selectedUser.username}</h3>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-sm font-normal py-1 px-3 border-foreground/20">
+                                            {ROLE_LABELS[selectedUser.role?.toLowerCase()] || selectedUser.role}
+                                        </Badge>
+                                        <span className={cn("text-xs font-medium px-2.5 py-1 rounded-full border",
+                                            selectedUser.is_active !== false
+                                                ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/50"
+                                                : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50"
+                                        )}>
+                                            {selectedUser.is_active !== false ? "Активен" : "Неактивен"}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
                             <Separator />
 
                             {/* Info */}
-                            <div className="space-y-4 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">ID:</span>
-                                    <span className="font-mono">{selectedUser.id}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Статус:</span>
-                                    <span className={selectedUser.is_active !== false ? "text-green-600 font-medium" : "text-destructive font-medium"}>
-                                        {selectedUser.is_active !== false ? "Активен" : "Неактивен"}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Дата регистрации:</span>
-                                    {/* Assuming created_at exists, handling potential missing field */}
-                                    <span>{selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleDateString('ru-RU') : "-"}</span>
+                            <div className="grid gap-4">
+                                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Основная информация</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5 p-3 rounded-lg border bg-muted/30">
+                                        <span className="text-xs text-muted-foreground font-medium">ID Сотрудника</span>
+                                        <div className="font-mono text-sm font-semibold text-foreground">#{selectedUser.id}</div>
+                                    </div>
+                                    <div className="space-y-1.5 p-3 rounded-lg border bg-muted/30">
+                                        <span className="text-xs text-muted-foreground font-medium">Дата регистрации</span>
+                                        <div className="text-sm font-semibold text-foreground">
+                                            {selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleDateString('ru-RU') : "-"}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -480,20 +487,28 @@ export default function UsersPage() {
                             {/* Admin Zone: Password Reset */}
                             {isAdmin && (
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-primary font-semibold">
-                                        <Shield className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 text-destructive font-semibold">
+                                        <Shield className="h-5 w-5" />
                                         <span>Зона администратора</span>
                                     </div>
 
-                                    <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 space-y-3">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <KeyRound className="h-4 w-4 text-muted-foreground" />
-                                            <span className="font-medium text-sm">Сброс пароля</span>
+                                    <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-6 space-y-6">
+                                        <div className="flex items-start gap-4">
+                                            <div className="p-3 bg-white dark:bg-red-950 rounded-xl shadow-sm border border-red-100 dark:border-red-900/30">
+                                                <KeyRound className="h-6 w-6 text-red-600 dark:text-red-400" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <h4 className="font-bold text-red-900 dark:text-red-200">Сброс пароля</h4>
+                                                <p className="text-sm text-red-700 dark:text-red-300/80 leading-relaxed">
+                                                    Установите новый пароль для сотрудника. Это действие нельзя отменить, старый пароль перестанет действовать.
+                                                </p>
+                                            </div>
                                         </div>
 
-                                        <div className="space-y-2">
+                                        <div className="space-y-3">
                                             <Input
                                                 type="text"
+                                                className="bg-white dark:bg-background border-red-200 focus-visible:ring-red-500 h-11"
                                                 placeholder="Введите новый пароль"
                                                 value={newPassword}
                                                 onChange={(e) => {
@@ -502,19 +517,19 @@ export default function UsersPage() {
                                                 }}
                                             />
                                             <Button
-                                                className="w-full"
+                                                className="w-full bg-red-600 hover:bg-red-700 text-white border-none h-11 font-medium shadow-sm active:scale-[0.98] transition-all"
                                                 onClick={handlePasswordReset}
                                                 disabled={isResetting || !newPassword}
                                             >
-                                                {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                {isResetting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                                                 Обновить пароль
                                             </Button>
                                         </div>
 
                                         {resetSuccess && (
-                                            <div className="flex items-center gap-2 text-green-600 text-sm mt-2 animate-in fade-in slide-in-from-top-1">
-                                                <CheckCircle2 className="h-4 w-4" />
-                                                <span>Пароль успешно обновлен</span>
+                                            <div className="flex items-center justify-center gap-2 text-green-700 text-sm p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-900/50 animate-in fade-in zoom-in-95">
+                                                <CheckCircle2 className="h-5 w-5" />
+                                                <span className="font-semibold">Пароль успешно обновлен</span>
                                             </div>
                                         )}
                                     </div>
