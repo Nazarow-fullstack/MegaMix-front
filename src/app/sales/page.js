@@ -22,6 +22,76 @@ import {
 } from "@/components/ui/dialog"
 import { Combobox } from "@/components/ui/combobox"
 
+function CartItemRow({ item, updateQuantity, removeItem, addItem }) {
+    const [inputValue, setInputValue] = useState(item.quantity.toString())
+
+    useEffect(() => {
+        setInputValue(item.quantity.toString())
+    }, [item.quantity])
+
+    const handleInputChange = (e) => {
+        const val = e.target.value
+        setInputValue(val)
+
+        if (val === "") return
+        const num = parseInt(val)
+        if (!isNaN(num) && num > 0) {
+            updateQuantity(item.id, num)
+        }
+    }
+
+    const handleBlur = () => {
+        if (inputValue === "" || parseInt(inputValue) <= 0 || isNaN(parseInt(inputValue))) {
+            setInputValue(item.quantity.toString())
+            if (item.quantity !== parseInt(inputValue)) {
+                // Force update if needed, though usually handled by effect
+            }
+        }
+    }
+
+    return (
+        <motion.div
+            layout
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="group flex flex-col gap-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-3 shadow-sm hover:border-violet-500/30 transition-colors"
+        >
+            <div className="flex justify-between items-start">
+                <div className="flex-1 pr-2">
+                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 line-clamp-2">{item.name}</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">{item.sell_price} c. / {item.unit}</p>
+                </div>
+                <p className="font-bold text-sm text-zinc-900 dark:text-white">{(item.sell_price * item.quantity).toFixed(0)}</p>
+            </div>
+
+            <Separator className="bg-zinc-100 dark:bg-zinc-800" />
+
+            <div className="flex items-center justify-between">
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => removeItem(item.id)}>
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+
+                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
+                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
+                        <Minus className="h-3 w-3" />
+                    </Button>
+                    <Input
+                        type="number"
+                        value={inputValue}
+                        onChange={handleInputChange}
+                        onBlur={handleBlur}
+                        className="w-12 h-7 p-0 text-center text-sm font-bold bg-transparent border-0 focus-visible:ring-0 shadow-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => addItem(item)}>
+                        <Plus className="h-3 w-3" />
+                    </Button>
+                </div>
+            </div>
+        </motion.div>
+    )
+}
+
 export default function SalesPage() {
     const { user, isLoading: isAuthLoading } = useAuthStore()
     const {
@@ -269,58 +339,13 @@ export default function SalesPage() {
                             ) : (
                                 <div className="space-y-3 pb-20 lg:pb-0">
                                     {items.map(item => (
-                                        <motion.div
+                                        <CartItemRow
                                             key={item.id}
-                                            layout
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.95 }}
-                                            className="group flex flex-col gap-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-3 shadow-sm hover:border-violet-500/30 transition-colors"
-                                        >
-                                            <div className="flex justify-between items-start">
-                                                <div className="flex-1 pr-2">
-                                                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 line-clamp-2">{item.name}</p>
-                                                    <p className="text-xs text-zinc-400 mt-0.5">{item.sell_price} c. / {item.unit}</p>
-                                                </div>
-                                                <p className="font-bold text-sm text-zinc-900 dark:text-white">{(item.sell_price * item.quantity).toFixed(0)}</p>
-                                            </div>
-
-                                            <Separator className="bg-zinc-100 dark:bg-zinc-800" />
-
-                                            <div className="flex items-center justify-between">
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => removeItem(item.id)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-
-                                                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
-                                                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
-                                                        <Minus className="h-3 w-3" />
-                                                    </Button>
-                                                    <Input
-                                                        type="number"
-                                                        value={item.quantity}
-                                                        onChange={(e) => {
-                                                            const val = e.target.value;
-                                                            if (val === "") return; // Allow empty while typing
-                                                            const num = parseInt(val);
-                                                            if (!isNaN(num) && num > 0) {
-                                                                updateQuantity(item.id, num);
-                                                            }
-                                                        }}
-                                                        onBlur={(e) => {
-                                                            // Reset to 1 if user leaves it empty or 0
-                                                            if (!e.target.value || parseInt(e.target.value) <= 0) {
-                                                                updateQuantity(item.id, 1);
-                                                            }
-                                                        }}
-                                                        className="w-12 h-7 p-0 text-center text-sm font-bold bg-transparent border-0 focus-visible:ring-0 shadow-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                    />
-                                                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => addItem(item)}>
-                                                        <Plus className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </motion.div>
+                                            item={item}
+                                            updateQuantity={updateQuantity}
+                                            removeItem={removeItem}
+                                            addItem={addItem}
+                                        />
                                     ))}
                                 </div>
                             )}
