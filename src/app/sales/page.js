@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/authStore"
 import { useCartStore } from "@/store/cartStore"
 
 import { Button } from "@/components/ui/button"
+import PaginationControls from "@/components/ui/PaginationControls"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -45,9 +46,13 @@ export default function SalesPage() {
     const [paidAmount, setPaidAmount] = useState("")
     const [checkoutResult, setCheckoutResult] = useState(null)
 
+    // Pagination
+    const [page, setPage] = useState(1)
+    const limit = 20
+
     useEffect(() => {
-        fetchCatalog()
-    }, [fetchCatalog])
+        fetchCatalog({ page, limit })
+    }, [page, fetchCatalog])
 
     // Hydration Guard
     if (!user || isAuthLoading) {
@@ -178,6 +183,16 @@ export default function SalesPage() {
                             })}
                         </div>
                     )}
+
+
+                    <div className="pb-20 lg:pb-10">
+                        <PaginationControls
+                            page={page}
+                            setPage={setPage}
+                            hasMore={products.length === limit}
+                            isLoading={isLoadingData}
+                        />
+                    </div>
                 </ScrollArea>
 
                 {/* Mobile Floating Footer - Only visible on Mobile when items > 0 */}
@@ -196,16 +211,16 @@ export default function SalesPage() {
 
                 {/* Desktop Gradient Fade */}
                 <div className="hidden lg:block absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-zinc-950 to-transparent pointer-events-none" />
-            </div>
+            </div >
 
             {/* RECEIPT PANEL */}
-            <div className={`
+            < div className={`
                 flex-[3] flex-col rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden
                 ${mobileTab === 'cart' ? 'flex h-full' : 'hidden'}
                 lg:flex
             `}>
                 {/* Header */}
-                <div className="p-4 bg-zinc-50 dark:bg-zinc-900/40 border-b border-zinc-200 dark:border-zinc-800 space-y-3">
+                < div className="p-4 bg-zinc-50 dark:bg-zinc-900/40 border-b border-zinc-200 dark:border-zinc-800 space-y-3" >
                     <div className="flex items-center gap-2 text-zinc-400 text-xs uppercase tracking-widest font-bold">
                         <Wallet className="h-3 w-3" />
                         Ваш чек
@@ -234,10 +249,10 @@ export default function SalesPage() {
                             emptyText="Клиент не найден."
                         />
                     </div>
-                </div>
+                </div >
 
                 {/* List */}
-                <div className="flex-1 overflow-hidden relative bg-zinc-50/30 dark:bg-zinc-900/20">
+                < div className="flex-1 overflow-hidden relative bg-zinc-50/30 dark:bg-zinc-900/20" >
                     <ScrollArea className="h-full p-4">
                         <AnimatePresence mode="popLayout">
                             {items.length === 0 ? (
@@ -312,10 +327,10 @@ export default function SalesPage() {
                         </AnimatePresence>
                     </ScrollArea>
                     <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-white dark:from-zinc-950 to-transparent pointer-events-none" />
-                </div>
+                </div >
 
                 {/* Footer */}
-                <div className="bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 p-6 z-20 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+                < div className="bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 p-6 z-20 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]" >
                     <div className="space-y-1 mb-6">
                         <div className="flex justify-between items-baseline">
                             <span className="text-base font-semibold text-zinc-700 dark:text-zinc-300">Итого</span>
@@ -359,12 +374,12 @@ export default function SalesPage() {
                             Оплатить
                         </Button>
                     </div>
-                </div>
+                </div >
 
-            </div>
+            </div >
 
             {/* Result Dialog */}
-            <Dialog open={!!checkoutResult} onOpenChange={() => setCheckoutResult(null)}>
+            < Dialog open={!!checkoutResult} onOpenChange={() => setCheckoutResult(null)}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className={checkoutResult?.success ? "text-emerald-600" : "text-red-600"}>
@@ -380,8 +395,8 @@ export default function SalesPage() {
                         </Button>
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
-        </div>
+        </div >
     )
 }

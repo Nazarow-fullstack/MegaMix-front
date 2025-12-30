@@ -6,10 +6,11 @@ export const useExpenseStore = create((set, get) => ({
     isLoading: false,
     error: null,
 
-    fetchExpenses: async () => {
+    fetchExpenses: async ({ page = 1, limit = 20 } = {}) => {
         set({ isLoading: true, error: null });
         try {
-            const res = await api.get('/api/expenses');
+            const skip = (page - 1) * limit;
+            const res = await api.get('/api/expenses', { params: { skip, limit } });
             set({ expenses: res.data, isLoading: false });
         } catch (error) {
             console.error("Failed to fetch expenses", error);

@@ -58,15 +58,13 @@ export const useCartStore = create(
                 return get().items.reduce((total, item) => total + item.quantity, 0);
             },
 
-            fetchCatalog: async () => {
-                const { products } = get();
-                // Optional optimization: don't refetch if we already have data
-                if (products.length > 0) return;
-
+            fetchCatalog: async ({ page = 1, limit = 20 } = {}) => {
+                // Removed heuristic "products.length > 0" check to allow refetching new pages
                 set({ isLoadingData: true });
                 try {
+                    const skip = (page - 1) * limit;
                     const [productsRes, clientsRes] = await Promise.all([
-                        api.get('/api/inventory/products', { params: { skip: 0, limit: 100 } }),
+                        api.get('/api/inventory/products', { params: { skip, limit } }),
                         api.get('/api/clients/clients')
                     ]);
 
@@ -77,7 +75,6 @@ export const useCartStore = create(
                     });
                 } catch (error) {
                     console.error("Failed to fetch catalog:", error);
-                    // Even if it fails, stop loading
                     set({ isLoadingData: false });
                 }
             },

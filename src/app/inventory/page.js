@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query" // turbo
 import { Plus, Search, Loader2, RefreshCcw, Pencil, Trash } from "lucide-react"
 
 import { useAuthStore } from "@/store/authStore"
 import { useProductStore } from "@/store/productStore"
 import api from "@/utils/axios"
+import PaginationControls from "@/components/ui/PaginationControls"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -65,6 +66,8 @@ export default function InventoryPage() {
     const { user, isLoading: isAuthLoading } = useAuthStore()
     const queryClient = useQueryClient()
     const [search, setSearch] = useState("")
+    const [page, setPage] = useState(1)
+    const limit = 20
 
     if (!user || isAuthLoading) {
         return (
@@ -100,14 +103,20 @@ export default function InventoryPage() {
 
     // Fetch Products
     const { data: products = [], isLoading, isError } = useQuery({
-        queryKey: ['products'],
+        queryKey: ['products', page, limit], // Add page/limit to key
         queryFn: async () => {
-            const res = await api.get('/api/inventory/products')
+            const skip = (page - 1) * limit
+            // Pass params. Note: If search support is added to backend later, pass it here too.
+            // For now we just paginate.
+            const res = await api.get('/api/inventory/products', { params: { skip, limit } })
             return res.data
-        }
+        },
+        placeholderData: keepPreviousData // Prevent flickering
     })
 
-    // Filter Products
+    // Filter Products - Server side ideally, but for now client side on the fetched chunk if backend doesn't support search
+    // If we want search to work across all data, backend must handle it. 
+    // Assuming backend returns paginated list.
     const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(search.toLowerCase())
     )
@@ -355,6 +364,13 @@ export default function InventoryPage() {
                     </TableBody>
                 </Table>
             </div>
+
+            <PaginationControls
+                page={page}
+                setPage={setPage}
+                hasMore={products.length === limit} // Heuristic for list response
+                isLoading={isLoading}
+            />
 
             {/* Create Product Dialog */}
             <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>

@@ -11,6 +11,7 @@ import api from "@/utils/axios"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import PaginationControls from "@/components/ui/PaginationControls"
 import {
     Table,
     TableBody,
@@ -49,9 +50,11 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 
 export default function ClientsPage() {
     const { user, isLoading: isAuthLoading } = useAuthStore()
-    const { history, isHistoryLoading, fetchClientHistory, updateClient, deleteClient } = useClientStore()
+    const { history, isHistoryLoading, fetchClientHistory, updateClient, deleteClient, clients, fetchClients, isLoading: isClientsLoading } = useClientStore()
     const queryClient = useQueryClient()
     const [search, setSearch] = useState("")
+    const [page, setPage] = useState(1)
+    const limit = 20
 
     // Dialog & Sheet States
     const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -75,14 +78,10 @@ export default function ClientsPage() {
     const canEdit = user?.role === "admin" || user?.role === "manager"
     const canDelete = user?.role === "admin"
 
-    // Fetch Clients
-    const { data: clients = [], isLoading } = useQuery({
-        queryKey: ['clients'],
-        queryFn: async () => {
-            const res = await api.get('/api/clients/clients')
-            return res.data
-        }
-    })
+    // Fetch Clients Effect
+    useEffect(() => {
+        fetchClients({ page, limit, search })
+    }, [page, search, fetchClients])
 
     // Fetch History Effect
     useEffect(() => {
@@ -91,11 +90,8 @@ export default function ClientsPage() {
         }
     }, [isSheetOpen, selectedClient, fetchClientHistory])
 
-    // Filter
-    const filteredClients = clients.filter(c =>
-        c.full_name.toLowerCase().includes(search.toLowerCase()) ||
-        (c.phone && c.phone.includes(search))
-    )
+    // Use clients directly from store (server-side filtered)
+    const filteredClients = clients
 
     // Create/Update Client Mutation
     const createOrUpdateClientMutation = useMutation({
@@ -107,7 +103,8 @@ export default function ClientsPage() {
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['clients'])
+            // Invalidate store by re-fetching
+            fetchClients({ page, limit, search })
             setIsCreateOpen(false)
             setIsEditing(false)
             setSelectedClient(null)
@@ -120,7 +117,7 @@ export default function ClientsPage() {
             await deleteClient(id)
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['clients'])
+            fetchClients({ page, limit, search })
             setIsDeleteOpen(false)
             setClientToDelete(null)
         }
@@ -132,7 +129,7 @@ export default function ClientsPage() {
             await api.post('/api/clients/payments', paymentData)
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['clients'])
+            fetchClients({ page, limit, search })
             setIsPaymentOpen(false)
             // Optionally close sheet or refresh history if open
             if (isSheetOpen && selectedClient) {
@@ -197,7 +194,10 @@ export default function ClientsPage() {
                         <Input
                             placeholder="Поиск по имени или телефону..."
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onChange={(e) => {
+                                setSearch(e.target.value)
+                                setPage(1)
+                            }}
                             className="pl-8 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                         />
                     </div>
@@ -223,7 +223,7 @@ export default function ClientsPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {isLoading ? (
+                        {isClientsLoading ? (
                             <TableRow>
                                 <TableCell colSpan={canEdit ? 5 : 4} className="h-24 text-center">
                                     <div className="flex justify-center items-center gap-2 text-zinc-500">
@@ -326,8 +326,16 @@ export default function ClientsPage() {
                             })
                         )}
                     </TableBody>
+
                 </Table>
             </div>
+
+            <PaginationControls
+                page={page}
+                setPage={setPage}
+                hasMore={clients.length === limit}
+                isLoading={isClientsLoading}
+            />
 
             {/* Client History Sheet */}
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
@@ -532,6 +540,6 @@ export default function ClientsPage() {
                     </form>
                 </DialogContent>
             </Dialog>
-        </div>
+        </div >
     )
 }

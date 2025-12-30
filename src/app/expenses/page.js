@@ -8,6 +8,7 @@ import { useExpenseStore } from "@/store/expenseStore"
 import { cn } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
+import PaginationControls from "@/components/ui/PaginationControls"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -68,13 +69,15 @@ export default function ExpensesPage() {
         description: ""
     })
     const [formError, setFormError] = useState(null)
+    const [page, setPage] = useState(1)
+    const limit = 20
 
     // Initial Fetch
     useEffect(() => {
         if (user) {
-            fetchExpenses()
+            fetchExpenses({ page, limit })
         }
-    }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [user, page, fetchExpenses]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Handlers
     const handleAddSubmit = async (e) => {
@@ -247,6 +250,13 @@ export default function ExpensesPage() {
                     )}
                 </CardContent>
             </Card>
+
+            <PaginationControls
+                page={page}
+                setPage={setPage}
+                hasMore={expenses.length === limit}
+                isLoading={isExpensesLoading}
+            />
 
             {/* Add Expense Dialog */}
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
