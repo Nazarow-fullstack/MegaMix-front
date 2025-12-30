@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query" // turbo
+import { useMutation, useQueryClient } from "@tanstack/react-query" // turbo
 import { Plus, Search, Loader2, RefreshCcw, Pencil, Trash } from "lucide-react"
 
 import { useAuthStore } from "@/store/authStore"
@@ -99,27 +99,12 @@ export default function InventoryPage() {
     const [productToEdit, setProductToEdit] = useState(null)
 
     // Store Actions
-    const { updateProduct, deleteProduct } = useProductStore()
+    const { products, isLoading, fetchProducts, updateProduct, deleteProduct } = useProductStore()
 
     // Fetch Products
-    const { data: products = [], isLoading, isError } = useQuery({
-        queryKey: ['products', page, limit], // Add page/limit to key
-        queryFn: async () => {
-            const skip = (page - 1) * limit
-            // Pass params. Note: If search support is added to backend later, pass it here too.
-            // For now we just paginate.
-            const res = await api.get('/api/inventory/products', { params: { skip, limit } })
-            return res.data
-        },
-        placeholderData: keepPreviousData // Prevent flickering
-    })
-
-    // Filter Products - Server side ideally, but for now client side on the fetched chunk if backend doesn't support search
-    // If we want search to work across all data, backend must handle it. 
-    // Assuming backend returns paginated list.
-    const filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(search.toLowerCase())
-    )
+    useEffect(() => {
+        fetchProducts(page, limit, search)
+    }, [page, search, fetchProducts])
 
     // Mutations
     const createProductMutation = useMutation({
@@ -127,7 +112,7 @@ export default function InventoryPage() {
             await api.post('/api/inventory/products', newProduct)
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['products'])
+            fetchProducts(page, limit, search)
             setIsAddProductOpen(false)
         }
     })
@@ -137,7 +122,7 @@ export default function InventoryPage() {
             await api.post('/api/inventory/movements', movement)
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['products'])
+            fetchProducts(page, limit, search)
             setIsMoveStockOpen(false)
             setSelectedProduct(null)
         }
@@ -148,7 +133,7 @@ export default function InventoryPage() {
             await updateProduct(productToEdit.id, data)
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['products'])
+            fetchProducts(page, limit, search)
             setIsEditOpen(false)
             setProductToEdit(null)
         }
@@ -159,7 +144,7 @@ export default function InventoryPage() {
             await deleteProduct(id)
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['products'])
+            fetchProducts(page, limit, search)
             setIsDeleteOpen(false)
             setProductToDelete(null)
         }
@@ -238,7 +223,10 @@ export default function InventoryPage() {
                         <Input
                             placeholder="Поиск товара..."
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onChange={(e) => {
+                                setSearch(e.target.value)
+                                setPage(1)
+                            }}
                             className="pl-8 h-10 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                         />
                     </div>
@@ -275,7 +263,7 @@ export default function InventoryPage() {
                                     </div>
                                 </TableCell>
                             </TableRow>
-                        ) : filteredProducts.length === 0 ? (
+                        ) : products.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={7} className="h-64 text-center">
                                     <div className="flex flex-col items-center justify-center gap-2 text-zinc-500">
@@ -290,7 +278,7 @@ export default function InventoryPage() {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredProducts.map((product) => {
+                            products.map((product) => {
                                 const isLowStock = product.quantity <= product.min_stock_level
                                 return (
                                     <TableRow

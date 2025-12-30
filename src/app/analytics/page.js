@@ -35,8 +35,16 @@ import {
     SheetContent,
     SheetHeader,
     SheetTitle,
+
     SheetDescription,
 } from "@/components/ui/sheet"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter, // in case needed, but user didn't explicitly ask for footer actions, just footer text
+} from "@/components/ui/dialog"
 import {
     Table,
     TableBody,
@@ -59,6 +67,7 @@ export default function AnalyticsPage() {
 
     // Drill Down State
     const [detailsType, setDetailsType] = useState(null) // 'sales' | 'products' | 'expenses'
+    const [selectedSale, setSelectedSale] = useState(null)
     const isSheetOpen = !!detailsType
 
     // Hydration/Auth Loading Guard
@@ -387,7 +396,11 @@ export default function AnalyticsPage() {
                                         </TableHeader>
                                         <TableBody>
                                             {salesList.map((sale) => (
-                                                <TableRow key={sale.id}>
+                                                <TableRow
+                                                    key={sale.id}
+                                                    className="cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                                    onClick={() => setSelectedSale(sale)}
+                                                >
                                                     <TableCell className="text-xs text-zinc-500 font-medium whitespace-nowrap">
                                                         {new Date(sale.created_at).toLocaleDateString('ru-RU')} <br />
                                                         <span className="text-[10px] text-zinc-400">
@@ -399,7 +412,7 @@ export default function AnalyticsPage() {
                                                             {sale.client_name || "Анонимный покупатель"}
                                                         </div>
                                                         <div className="text-xs text-zinc-500 flex flex-wrap gap-1 mt-1">
-                                                            {sale.items?.map((item, idx) => (
+                                                            {sale.items?.slice(0, 3).map((item, idx) => (
                                                                 <span key={idx} className="inline-flex items-center bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-[10px]">
                                                                     <span className="font-medium text-zinc-700 dark:text-zinc-300 mr-1">
                                                                         {item.product?.name || item.product_name || item.name || "Товар"}
@@ -407,6 +420,9 @@ export default function AnalyticsPage() {
                                                                     <span className="text-zinc-400">x{item.quantity}</span>
                                                                 </span>
                                                             )) || "—"}
+                                                            {(sale.items?.length || 0) > 3 && (
+                                                                <span className="text-[10px] text-zinc-400 self-center">+{sale.items.length - 3} еще...</span>
+                                                            )}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right font-medium">
@@ -528,6 +544,58 @@ export default function AnalyticsPage() {
                     </div>
                 </SheetContent>
             </Sheet>
+            {/* Receipt Detail Dialog */}
+            <Dialog open={!!selectedSale} onOpenChange={(open) => !open && setSelectedSale(null)}>
+                <DialogContent className="sm:max-w-[425px] bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+                    <DialogHeader className="border-b border-zinc-100 dark:border-zinc-800 pb-4">
+                        <DialogTitle className="flex flex-col gap-1 items-start">
+                            <span className="text-xl font-bold">Чек #{selectedSale?.id}</span>
+                            <span className="text-xs font-normal text-zinc-500">
+                                {selectedSale && new Date(selectedSale.created_at).toLocaleString('ru-RU')}
+                            </span>
+                        </DialogTitle>
+                        <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mt-2">
+                            {selectedSale?.client_name || "Анонимный покупатель"}
+                        </div>
+                    </DialogHeader>
+
+                    <div className="py-4">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="hover:bg-transparent border-b border-zinc-100 dark:border-zinc-800">
+                                    <TableHead className="w-[50%] pl-0">Товар</TableHead>
+                                    <TableHead className="text-right">Детали</TableHead>
+                                    <TableHead className="text-right pr-0">Сумма</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {selectedSale?.items?.map((item, idx) => (
+                                    <TableRow key={idx} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 border-b border-zinc-50 dark:border-zinc-900">
+                                        <TableCell className="py-2 pl-0">
+                                            <div className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
+                                                {item.product?.name || `Товар #${item.product_id}`}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right py-2 text-zinc-500 text-sm whitespace-nowrap">
+                                            {item.quantity} {item.product?.unit || 'шт'} × {item.price} c.
+                                        </TableCell>
+                                        <TableCell className="text-right py-2 font-bold text-zinc-900 dark:text-zinc-100 pr-0">
+                                            {formatMoney(item.price * item.quantity)}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 flex justify-between items-center">
+                        <span className="text-sm text-zinc-500">Итого к оплате:</span>
+                        <span className="text-2xl font-black text-violet-600 dark:text-violet-400">
+                            {formatMoney(selectedSale?.total_amount)}
+                        </span>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

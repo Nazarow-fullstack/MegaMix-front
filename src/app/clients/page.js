@@ -386,34 +386,40 @@ export default function ClientsPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {history.map((record, i) => (
-                                            <TableRow key={i}>
-                                                <TableCell className="text-xs text-zinc-500 font-medium">
-                                                    {new Date(record.created_at).toLocaleDateString('ru-RU')}
-                                                    <div className="text-[10px] text-zinc-400">
-                                                        {new Date(record.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {record.type === 'payment' ? (
-                                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/50 gap-1 pl-1 pr-2">
-                                                            <ArrowDownLeft className="h-3 w-3" /> Платеж
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50 gap-1 pl-1 pr-2">
-                                                            <ArrowUpRight className="h-3 w-3" /> Продажа
-                                                        </Badge>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-zinc-600 dark:text-zinc-300">
-                                                    {record.description || (record.type === 'sale' ? `Продажа #${record.id}` : 'Оплата')}
-                                                </TableCell>
-                                                <TableCell className={`text-right font-bold ${record.type === 'payment' ? "text-green-600" : "text-red-600"
-                                                    }`}>
-                                                    {record.type === 'payment' ? '+' : '-'}{Math.abs(record.amount)} c.
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {history.map((record, i) => {
+                                            const dateString = record.date || record.created_at;
+                                            const dateObj = new Date(dateString);
+                                            const isValid = !isNaN(dateObj.getTime());
+
+                                            return (
+                                                <TableRow key={i}>
+                                                    <TableCell className="text-xs text-zinc-500 font-medium">
+                                                        {isValid ? dateObj.toLocaleDateString('ru-RU') : "-"}
+                                                        <div className="text-[10px] text-zinc-400">
+                                                            {isValid ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {record.type === 'payment' ? (
+                                                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/50 gap-1 pl-1 pr-2">
+                                                                <ArrowDownLeft className="h-3 w-3" /> Платеж
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50 gap-1 pl-1 pr-2">
+                                                                <ArrowUpRight className="h-3 w-3" /> Продажа
+                                                            </Badge>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-zinc-600 dark:text-zinc-300">
+                                                        {record.description || (record.type === 'sale' ? `Продажа #${record.id}` : 'Оплата')}
+                                                    </TableCell>
+                                                    <TableCell className={`text-right font-bold ${record.type === 'payment' ? "text-green-600" : "text-red-600"
+                                                        }`}>
+                                                        {record.type === 'payment' ? '+' : '-'}{Math.abs(record.amount)} c.
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
                                     </TableBody>
                                 </Table>
                             )}
