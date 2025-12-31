@@ -54,7 +54,7 @@ export default function ClientsPage() {
     const queryClient = useQueryClient()
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
-    const limit = 10
+    const limit = 20
 
     // Dialog & Sheet States
     const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -91,7 +91,6 @@ export default function ClientsPage() {
     }, [isSheetOpen, selectedClient, fetchClientHistory])
 
     // Use clients directly from store (server-side filtered)
-    const filteredClients = clients
 
     // Create/Update Client Mutation
     const createOrUpdateClientMutation = useMutation({
@@ -232,7 +231,7 @@ export default function ClientsPage() {
                                     </div>
                                 </TableCell>
                             </TableRow>
-                        ) : filteredClients.length === 0 ? (
+                        ) : clients.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={canEdit ? 5 : 4} className="h-64 text-center">
                                     <div className="flex flex-col items-center justify-center gap-2 text-zinc-500">
@@ -242,7 +241,7 @@ export default function ClientsPage() {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredClients.map((client) => {
+                            clients.map((client) => {
                                 const debt = client.total_debt || 0
                                 let debtBadge = null
 

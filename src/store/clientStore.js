@@ -7,12 +7,15 @@ export const useClientStore = create((set) => ({
     history: [],
     isHistoryLoading: false,
 
-    fetchClients: async ({ page = 1, limit = 100, search = "" } = {}) => {
+    fetchClients: async ({ page = 1, limit = 20, search = "" } = {}) => {
         set({ isLoading: true });
         try {
             const skip = (page - 1) * limit;
             const params = { skip, limit };
             if (search) params.search = search;
+
+            // Log for debugging
+            console.log("Fetching clients with params:", params);
 
             const res = await api.get('/api/clients/clients', { params });
             set({ clients: res.data, isLoading: false });

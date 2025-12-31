@@ -43,7 +43,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogFooter, // in case needed, but user didn't explicitly ask for footer actions, just footer text
+    DialogFooter, 
 } from "@/components/ui/dialog"
 import {
     Table,
