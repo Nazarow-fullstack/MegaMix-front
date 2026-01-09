@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Loader2, ShoppingCart, Trash2, Plus, Minus, CreditCard, RefreshCcw, User, Wallet, Grid } from "lucide-react"
+import { Search, Loader2, ShoppingCart, Trash2, Plus, Minus, CreditCard, RefreshCcw, Grid, Package, AlertCircle, Wallet } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 import { useAuthStore } from "@/store/authStore"
@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
     Dialog,
     DialogContent,
@@ -21,33 +23,86 @@ import {
     DialogDescription
 } from "@/components/ui/dialog"
 import { Combobox } from "@/components/ui/combobox"
+import { Label } from "@/components/ui/label"
 
-function CartItemRow({ item, updateQuantity, removeItem, addItem }) {
-    const [inputValue, setInputValue] = useState(item.quantity.toString())
+function CartItemRow({ item, updateCartItem, removeItem }) {
+    // Local state for inputs to allow smooth typing
+    // We sync with store on blur or intentional actions
+    const [priceInput, setPriceInput] = useState(item.customPrice?.toString() || item.sell_price?.toString() || "0")
 
-    useEffect(() => {
-        setInputValue(item.quantity.toString())
-    }, [item.quantity])
+    // Derived state for the "Packs" logic
+    // We don't store "isPack" in the database obviously, but maybe in the cart item state?
+    // The prompt says "Unit Toggle: Add a Switch/Checkbox... If checked: Show input for 'Packs'"
+    // We should probably persist this view state in the cart item so it doesn't reset on re-render.
+    // I added `isPack` and `packsInput` to cartStore addItem/updateCartItem.
 
-    const handleInputChange = (e) => {
+    const isPack = item.isPack || false
+    const packsInput = item.packsInput || 0
+    const itemsPerPack = item.items_per_pack || 12 // Default to 12 if missing, or handle gracefully
+
+    const handlePackToggle = (checked) => {
+        // If switching TO pack mode
+        if (checked) {
+            // Calculate how many packs roughly make up current quantity? 
+            // Or just reset to 1 pack? 
+            // "Display Qty = Input Packs * product.items_per_pack"
+            // Let's set default 1 pack
+            updateCartItem(item.id, {
+                isPack: true,
+                packsInput: 1,
+                quantity: itemsPerPack // 1 * items_per_pack
+            })
+        } else {
+            // Switching back to units
+            // Keep the current total quantity but treat as individual units
+            updateCartItem(item.id, {
+                isPack: false,
+                packsInput: 0,
+                quantity: item.quantity // Keep same quantity
+            })
+        }
+    }
+
+    const handlePacksChange = (e) => {
         const val = e.target.value
-        setInputValue(val)
+        const newPacks = parseInt(val)
 
-        if (val === "") return
-        const num = parseInt(val)
-        if (!isNaN(num) && num > 0) {
-            updateQuantity(item.id, num)
+        // Update local UI state via store (since it drives the quantity)
+        if (!isNaN(newPacks) && newPacks >= 0) {
+            updateCartItem(item.id, {
+                packsInput: newPacks,
+                quantity: newPacks * itemsPerPack
+            })
         }
     }
 
-    const handleBlur = () => {
-        if (inputValue === "" || parseInt(inputValue) <= 0 || isNaN(parseInt(inputValue))) {
-            setInputValue(item.quantity.toString())
-            if (item.quantity !== parseInt(inputValue)) {
-                // Force update if needed, though usually handled by effect
-            }
+    const handleQuantityChange = (e) => {
+        // Only allowed if !isPack
+        const val = parseInt(e.target.value)
+        if (!isNaN(val) && val >= 0) {
+            updateCartItem(item.id, { quantity: val })
         }
     }
+
+    const handlePriceChange = (e) => {
+        setPriceInput(e.target.value)
+    }
+
+    const handlePriceBlur = () => {
+        const val = parseFloat(priceInput)
+        if (!isNaN(val) && val >= 0) {
+            updateCartItem(item.id, { customPrice: val })
+        } else {
+            setPriceInput(item.customPrice?.toString() || item.sell_price.toString())
+        }
+    }
+
+    // Sync price input if store changes externally
+    useEffect(() => {
+        setPriceInput(item.customPrice?.toString() || item.sell_price?.toString())
+    }, [item.customPrice, item.sell_price])
+
+    const totalRowPrice = (item.customPrice || item.sell_price) * item.quantity
 
     return (
         <motion.div
@@ -55,37 +110,103 @@ function CartItemRow({ item, updateQuantity, removeItem, addItem }) {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="group flex flex-col gap-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-3 shadow-sm hover:border-violet-500/30 transition-colors"
+            className={`group flex flex-col gap-3 rounded-xl border p-4 shadow-sm transition-all 
+                ${isPack ? 'bg-violet-50/50 border-violet-100 dark:bg-violet-900/10 dark:border-violet-900/30' : 'bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-violet-500/30'}`}
         >
-            <div className="flex justify-between items-start">
-                <div className="flex-1 pr-2">
-                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 line-clamp-2">{item.name}</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">{item.sell_price} c. / {item.unit}</p>
+            {/* Header: Name and Remove */}
+            <div className="flex justify-between items-start gap-2">
+                <div className="flex-1">
+                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 leading-tight">
+                        {item.name}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-zinc-500 border-zinc-200 dark:border-zinc-700">
+                            {item.unit || "шт"}
+                        </Badge>
+                        {item.items_per_pack > 1 && (
+                            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                                В пачке: {item.items_per_pack}
+                            </Badge>
+                        )}
+                    </div>
                 </div>
-                <p className="font-bold text-sm text-zinc-900 dark:text-white">{(item.sell_price * item.quantity).toFixed(0)}</p>
-            </div>
-
-            <Separator className="bg-zinc-100 dark:bg-zinc-800" />
-
-            <div className="flex items-center justify-between">
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => removeItem(item.id)}>
+                <Button size="icon" variant="ghost" className="h-6 w-6 text-zinc-400 hover:text-red-500 hover:bg-red-50 -mr-2" onClick={() => removeItem(item.id)}>
                     <Trash2 className="h-4 w-4" />
                 </Button>
+            </div>
 
-                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => updateQuantity(item.id, item.quantity - 1)}>
-                        <Minus className="h-3 w-3" />
-                    </Button>
-                    <Input
-                        type="number"
-                        value={inputValue}
-                        onChange={handleInputChange}
-                        onBlur={handleBlur}
-                        className="w-12 h-7 p-0 text-center text-sm font-bold bg-transparent border-0 focus-visible:ring-0 shadow-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => addItem(item)}>
-                        <Plus className="h-3 w-3" />
-                    </Button>
+            <Separator className="bg-zinc-100 dark:bg-zinc-800/50" />
+
+            {/* Controls Grid */}
+            <div className="grid grid-cols-2 gap-3">
+
+                {/* Left Col: Quantity Logic */}
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                        <Checkbox
+                            id={`pack-check-${item.id}`}
+                            checked={isPack}
+                            onCheckedChange={handlePackToggle}
+                        />
+                        <Label htmlFor={`pack-check-${item.id}`} className="text-xs font-medium cursor-pointer select-none">
+                            📦 Пачка?
+                        </Label>
+                    </div>
+
+                    {isPack ? (
+                        <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md p-1 pl-2">
+                                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Пачек:</span>
+                                <Input
+                                    className="h-6 w-full p-0 border-0 focus-visible:ring-0 text-right font-bold text-sm bg-transparent"
+                                    type="number"
+                                    min="1"
+                                    value={packsInput}
+                                    onChange={handlePacksChange}
+                                />
+                            </div>
+                            <div className="text-[10px] text-zinc-500 text-right px-1">
+                                {packsInput} x {itemsPerPack} = <b>{item.quantity}</b> {item.unit}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
+                            <Button size="icon" variant="ghost" className="h-7 w-8 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => updateCartItem(item.id, { quantity: Math.max(1, item.quantity - 1) })}>
+                                <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                                type="number"
+                                value={item.quantity}
+                                onChange={handleQuantityChange}
+                                className="w-full h-7 p-0 text-center text-sm font-bold bg-transparent border-0 focus-visible:ring-0 shadow-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <Button size="icon" variant="ghost" className="h-7 w-8 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => updateCartItem(item.id, { quantity: item.quantity + 1 })}>
+                                <Plus className="h-3 w-3" />
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Col: Price Logic */}
+                <div className="space-y-2">
+                    <Label className="text-xs font-medium text-zinc-500 block text-right">
+                        Цена за шт.
+                    </Label>
+                    <div className="relative">
+                        <Input
+                            className="h-8 text-right pr-2 font-bold bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 focus:bg-white transition-colors"
+                            value={priceInput}
+                            onChange={handlePriceChange}
+                            onBlur={handlePriceBlur}
+                            type="number"
+                        />
+                    </div>
+                    <div className="text-right">
+                        <span className="text-xs text-zinc-400">Итого: </span>
+                        <span className="font-black text-sm text-violet-600 dark:text-violet-400">
+                            {totalRowPrice.toFixed(0)} c.
+                        </span>
+                    </div>
                 </div>
             </div>
         </motion.div>
@@ -98,7 +219,7 @@ export default function SalesPage() {
         items,
         addItem,
         removeItem,
-        updateQuantity,
+        updateCartItem,
         selectedClient,
         setClient,
         getTotal,
@@ -118,7 +239,7 @@ export default function SalesPage() {
 
     // Pagination
     const [page, setPage] = useState(1)
-    const limit = 10
+    const limit = 8
 
     useEffect(() => {
         fetchCatalog({ page, limit })
@@ -213,56 +334,61 @@ export default function SalesPage() {
                             <p className="text-lg font-medium">Товары не найдены</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4 pb-20 lg:pb-0">
-                            {filteredProducts.map(product => {
-                                const isOutOfStock = product.quantity <= 0;
-                                const isLowStock = product.quantity <= 5;
-                                return (
-                                    <div
-                                        key={product.id}
-                                        className={`group relative overflow-hidden rounded-xl border bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-950 transition-all active:scale-95 cursor-pointer flex flex-col
-                                            ${isOutOfStock ? 'opacity-60 grayscale border-zinc-200' : 'border-zinc-200 dark:border-zinc-800 hover:border-violet-500/50 hover:shadow-lg'}
-                                        `}
-                                        onClick={() => !isOutOfStock && addItem(product)}
-                                    >
-                                        <div className="p-3 sm:p-4 space-y-2 flex-grow">
-                                            <div className="flex justify-between items-start">
-                                                <Badge variant="secondary" className="bg-white/50 dark:bg-zinc-800/50 text-[10px] sm:text-xs px-1.5 py-0">
-                                                    {product.unit}
-                                                </Badge>
-                                                <Badge className={`text-[10px] sm:text-xs px-1.5 py-0 ${isOutOfStock ? "bg-red-100 text-red-600" : isLowStock ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"}`}>
-                                                    {product.quantity}
-                                                </Badge>
-                                            </div>
-                                            <h3 className="line-clamp-2 text-xs sm:text-sm font-medium h-8 sm:h-10 text-zinc-700 dark:text-zinc-200 leading-snug">
-                                                {product.name}
-                                            </h3>
-                                        </div>
-                                        <div className="p-3 sm:p-4 pt-0 flex items-end justify-between bg-white/50 dark:bg-zinc-900/50">
-                                            <div>
-                                                <div className="text-sm sm:text-lg font-bold text-zinc-900 dark:text-white">
-                                                    {product.sell_price} <span className="text-[10px] sm:text-xs font-normal text-zinc-500">c.</span>
+                        <div className="pb-32 lg:pb-4">
+                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
+                                {filteredProducts.map(product => {
+                                    const isOutOfStock = product.quantity <= 0;
+                                    const isLowStock = product.quantity <= 5;
+                                    return (
+                                        <div
+                                            key={product.id}
+                                            className={`group relative overflow-hidden rounded-xl border bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-950 transition-all active:scale-95 cursor-pointer flex flex-col
+                                                ${isOutOfStock ? 'opacity-60 grayscale border-zinc-200' : 'border-zinc-200 dark:border-zinc-800 hover:border-violet-500/50 hover:shadow-lg'}
+                                            `}
+                                            onClick={() => !isOutOfStock && addItem(product)}
+                                        >
+                                            <div className="p-3 sm:p-4 space-y-2 flex-grow">
+                                                <div className="flex justify-between items-start">
+                                                    <Badge variant="secondary" className="bg-white/50 dark:bg-zinc-800/50 text-[10px] sm:text-xs px-1.5 py-0">
+                                                        {product.unit}
+                                                    </Badge>
+                                                    <Badge className={`text-[10px] sm:text-xs px-1.5 py-0 ${isOutOfStock ? "bg-red-100 text-red-600" : isLowStock ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"}`}>
+                                                        {product.quantity}
+                                                    </Badge>
                                                 </div>
+                                                <h3 className="line-clamp-2 text-xs sm:text-sm font-medium h-8 sm:h-10 text-zinc-700 dark:text-zinc-200 leading-snug">
+                                                    {product.name}
+                                                </h3>
+                                                {product.items_per_pack > 1 && (
+                                                    <div className="flex items-center gap-1 text-[10px] text-zinc-400">
+                                                        <Package className="h-3 w-3" />
+                                                        <span>{product.items_per_pack} шт/уп</span>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <Button size="icon" className="h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-violet-100 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 hover:bg-violet-600 hover:text-white shadow-none">
-                                                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-                                            </Button>
+                                            <div className="p-3 sm:p-4 pt-0 flex items-end justify-between bg-white/50 dark:bg-zinc-900/50">
+                                                <div>
+                                                    <div className="text-sm sm:text-lg font-bold text-zinc-900 dark:text-white">
+                                                        {product.sell_price} <span className="text-[10px] sm:text-xs font-normal text-zinc-500">c.</span>
+                                                    </div>
+                                                </div>
+                                                <Button size="icon" className="h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-violet-100 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 hover:bg-violet-600 hover:text-white shadow-none">
+                                                    <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
+
+                            <PaginationControls
+                                page={page}
+                                setPage={setPage}
+                                hasMore={products.length === limit}
+                                isLoading={isLoadingData}
+                            />
                         </div>
                     )}
-
-
-                    <div className="pb-20 lg:pb-10">
-                        <PaginationControls
-                            page={page}
-                            setPage={setPage}
-                            hasMore={products.length === limit}
-                            isLoading={isLoadingData}
-                        />
-                    </div>
                 </ScrollArea>
 
                 {/* Mobile Floating Footer - Only visible on Mobile when items > 0 */}
@@ -342,9 +468,8 @@ export default function SalesPage() {
                                         <CartItemRow
                                             key={item.id}
                                             item={item}
-                                            updateQuantity={updateQuantity}
+                                            updateCartItem={updateCartItem}
                                             removeItem={removeItem}
-                                            addItem={addItem}
                                         />
                                     ))}
                                 </div>

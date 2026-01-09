@@ -62,14 +62,23 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 
+import { useRouter } from "next/navigation"
+
 export default function InventoryPage() {
     const { user, isLoading: isAuthLoading } = useAuthStore()
     const queryClient = useQueryClient()
+    const router = useRouter()
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
     const limit = 10
 
-    if (!user || isAuthLoading) {
+    useEffect(() => {
+        if (!isAuthLoading && user && user.role !== "admin") {
+            router.replace("/sales")
+        }
+    }, [user, isAuthLoading, router])
+
+    if (!user || isAuthLoading || user.role !== "admin") {
         return (
             <div className="flex items-center justify-center h-full min-h-[50vh]">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-700" />
@@ -158,9 +167,10 @@ export default function InventoryPage() {
             name: formData.get("name"),
             unit: formData.get("unit"),
             buy_price: parseFloat(formData.get("buy_price") || 0),
-            sell_price: parseFloat(formData.get("sell_price") || 0),
+            sell_price: parseFloat(formData.get("buy_price") || 0), // Dynamic pricing now, initial sell price = buy price
             min_stock_level: parseInt(formData.get("min_stock_level") || 0),
-            quantity: 0 // New products start with 0 stock usually, or added via distinct movement
+            items_per_pack: parseInt(formData.get("items_per_pack") || 1),
+            quantity: 0
         })
     }
 
@@ -187,8 +197,9 @@ export default function InventoryPage() {
             name: formData.get("name"),
             unit: formData.get("unit"),
             buy_price: parseFloat(formData.get("buy_price") || 0),
-            sell_price: parseFloat(formData.get("sell_price") || 0),
+            sell_price: parseFloat(formData.get("buy_price") || 0),
             min_stock_level: parseInt(formData.get("min_stock_level") || 0),
+            items_per_pack: parseInt(formData.get("items_per_pack") || 1),
         })
     }
 
@@ -204,7 +215,7 @@ export default function InventoryPage() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-24">
             {/* Header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -247,9 +258,10 @@ export default function InventoryPage() {
                             <TableHead className="w-[80px]">ID</TableHead>
                             <TableHead>Название</TableHead>
                             <TableHead>Ед. изм.</TableHead>
+                            <TableHead>В пачке</TableHead>
                             <TableHead>Остаток</TableHead>
                             {isAdmin && <TableHead>Закупка</TableHead>}
-                            {canSeePrices && <TableHead>Продажа</TableHead>}
+                            {/* {canSeePrices && <TableHead>Продажа</TableHead>} - Removed */}
                             <TableHead className="text-right">Действия</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -292,6 +304,7 @@ export default function InventoryPage() {
                                         <TableCell className="font-mono text-xs text-zinc-500">#{product.id}</TableCell>
                                         <TableCell className="font-medium text-zinc-950 dark:text-zinc-50">{product.name}</TableCell>
                                         <TableCell>{product.unit}</TableCell>
+                                        <TableCell>{product.items_per_pack || 1} шт/уп</TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-3">
                                                 <span className={`text-xl font-black ${isLowStock ? "text-red-600 dark:text-red-400" : "text-zinc-900 dark:text-zinc-100"}`}>
@@ -304,7 +317,7 @@ export default function InventoryPage() {
                                             </div>
                                         </TableCell>
                                         {isAdmin && <TableCell>{product.buy_price} ₽</TableCell>}
-                                        {canSeePrices && <TableCell>{product.sell_price} ₽</TableCell>}
+                                        {/* Sell Price Removed per requirements, canSeePrices no longer shows it here */}
                                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex items-center justify-end gap-1">
                                                 {canMoveStock && (
@@ -379,7 +392,7 @@ export default function InventoryPage() {
                                         <SelectTrigger className="bg-zinc-50 dark:bg-zinc-900">
                                             <SelectValue placeholder="Unit" />
                                         </SelectTrigger>
-                                        <SelectContent>
+                                        <SelectContent className="bg-white dark:bg-zinc-950 z-[200]">
                                             <SelectItem value="шт">шт</SelectItem>
                                             <SelectItem value="кг">кг</SelectItem>
                                             <SelectItem value="л">л</SelectItem>
@@ -388,20 +401,21 @@ export default function InventoryPage() {
                                     </Select>
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="min_stock_level">Мин. остаток</Label>
-                                    <Input id="min_stock_level" name="min_stock_level" type="number" defaultValue="10" className="bg-zinc-50 dark:bg-zinc-900" />
+                                    <Label htmlFor="items_per_pack">шт/уп</Label>
+                                    <Input id="items_per_pack" name="items_per_pack" type="number" defaultValue="1" className="bg-zinc-50 dark:bg-zinc-900" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
+                                    <Label htmlFor="min_stock_level">Мин. остаток</Label>
+                                    <Input id="min_stock_level" name="min_stock_level" type="number" defaultValue="10" className="bg-zinc-50 dark:bg-zinc-900" />
+                                </div>
+                                <div className="grid gap-2">
                                     <Label htmlFor="buy_price">Цена закупки</Label>
                                     <Input id="buy_price" name="buy_price" type="number" step="0.01" className="bg-zinc-50 dark:bg-zinc-900" />
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="sell_price">Цена продажи</Label>
-                                    <Input id="sell_price" name="sell_price" type="number" step="0.01" className="bg-zinc-50 dark:bg-zinc-900" />
-                                </div>
                             </div>
+
                         </div>
                         <DialogFooter>
                             <Button type="submit" disabled={createProductMutation.isPending} className="bg-violet-600 hover:bg-violet-700 text-white">
@@ -427,7 +441,7 @@ export default function InventoryPage() {
                                     <SelectTrigger className="bg-zinc-50 dark:bg-zinc-900">
                                         <SelectValue placeholder="Выберите тип" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-white dark:bg-zinc-950 z-[200]">
                                         <SelectItem value="IN">Приход (+)</SelectItem>
                                         <SelectItem value="OUT">Расход (-)</SelectItem>
                                         <SelectItem value="ADJUSTMENT">Корректировка (=)</SelectItem>
@@ -473,7 +487,7 @@ export default function InventoryPage() {
                                             <SelectTrigger className="bg-zinc-50 dark:bg-zinc-900">
                                                 <SelectValue placeholder="Unit" />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="bg-white dark:bg-zinc-950 z-[200]">
                                                 <SelectItem value="шт">шт</SelectItem>
                                                 <SelectItem value="кг">кг</SelectItem>
                                                 <SelectItem value="л">л</SelectItem>
@@ -482,20 +496,21 @@ export default function InventoryPage() {
                                         </Select>
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="edit-min_stock_level">Мин. остаток</Label>
-                                        <Input id="edit-min_stock_level" name="min_stock_level" type="number" defaultValue={productToEdit.min_stock_level} className="bg-zinc-50 dark:bg-zinc-900" />
+                                        <Label htmlFor="edit-items_per_pack">шт/уп</Label>
+                                        <Input id="edit-items_per_pack" name="items_per_pack" type="number" defaultValue={productToEdit.items_per_pack || 1} className="bg-zinc-50 dark:bg-zinc-900" />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="grid gap-2">
+                                        <Label htmlFor="edit-min_stock_level">Мин. остаток</Label>
+                                        <Input id="edit-min_stock_level" name="min_stock_level" type="number" defaultValue={productToEdit.min_stock_level} className="bg-zinc-50 dark:bg-zinc-900" />
+                                    </div>
+                                    <div className="grid gap-2">
                                         <Label htmlFor="edit-buy_price">Цена закупки</Label>
                                         <Input id="edit-buy_price" name="buy_price" type="number" step="0.01" defaultValue={productToEdit.buy_price} className="bg-zinc-50 dark:bg-zinc-900" />
                                     </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="edit-sell_price">Цена продажи</Label>
-                                        <Input id="edit-sell_price" name="sell_price" type="number" step="0.01" defaultValue={productToEdit.sell_price} className="bg-zinc-50 dark:bg-zinc-900" />
-                                    </div>
                                 </div>
+
                             </div>
                             <DialogFooter>
                                 <Button type="submit" disabled={updateProductMutation.isPending} className="bg-violet-600 hover:bg-violet-700 text-white">
