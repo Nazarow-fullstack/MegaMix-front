@@ -25,42 +25,18 @@ import {
 import { Combobox } from "@/components/ui/combobox"
 import { Label } from "@/components/ui/label"
 
-function CartItemRow({ item, updateCartItem, removeItem }) {
+function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice, togglePack }) {
     // Local state for inputs to allow smooth typing
     // We sync with store on blur or intentional actions
-    const [priceInput, setPriceInput] = useState(item.customPrice?.toString() || item.sell_price?.toString() || "0")
+    const [priceInput, setPriceInput] = useState(item.sold_price?.toString() || "0")
 
     // Derived state for the "Packs" logic
-    // We don't store "isPack" in the database obviously, but maybe in the cart item state?
-    // The prompt says "Unit Toggle: Add a Switch/Checkbox... If checked: Show input for 'Packs'"
-    // We should probably persist this view state in the cart item so it doesn't reset on re-render.
-    // I added `isPack` and `packsInput` to cartStore addItem/updateCartItem.
-
     const isPack = item.isPack || false
     const packsInput = item.packsInput || 0
     const itemsPerPack = item.items_per_pack || 12 // Default to 12 if missing, or handle gracefully
 
     const handlePackToggle = (checked) => {
-        // If switching TO pack mode
-        if (checked) {
-            // Calculate how many packs roughly make up current quantity? 
-            // Or just reset to 1 pack? 
-            // "Display Qty = Input Packs * product.items_per_pack"
-            // Let's set default 1 pack
-            updateCartItem(item.id, {
-                isPack: true,
-                packsInput: 1,
-                quantity: itemsPerPack // 1 * items_per_pack
-            })
-        } else {
-            // Switching back to units
-            // Keep the current total quantity but treat as individual units
-            updateCartItem(item.id, {
-                isPack: false,
-                packsInput: 0,
-                quantity: item.quantity // Keep same quantity
-            })
-        }
+        togglePack(item.id)
     }
 
     const handlePacksChange = (e) => {
@@ -91,18 +67,18 @@ function CartItemRow({ item, updateCartItem, removeItem }) {
     const handlePriceBlur = () => {
         const val = parseFloat(priceInput)
         if (!isNaN(val) && val >= 0) {
-            updateCartItem(item.id, { customPrice: val })
+            updateItemPrice(item.id, val)
         } else {
-            setPriceInput(item.customPrice?.toString() || item.sell_price.toString())
+            setPriceInput(item.sold_price?.toString() || "0")
         }
     }
 
     // Sync price input if store changes externally
     useEffect(() => {
-        setPriceInput(item.customPrice?.toString() || item.sell_price?.toString())
-    }, [item.customPrice, item.sell_price])
+        setPriceInput(item.sold_price?.toString() || "0")
+    }, [item.sold_price])
 
-    const totalRowPrice = (item.customPrice || item.sell_price) * item.quantity
+    const totalRowPrice = (item.sold_price || 0) * item.quantity
 
     return (
         <motion.div
@@ -220,6 +196,8 @@ export default function SalesPage() {
         addItem,
         removeItem,
         updateCartItem,
+        updateItemPrice,
+        togglePack,
         selectedClient,
         setClient,
         getTotal,
@@ -470,6 +448,8 @@ export default function SalesPage() {
                                             item={item}
                                             updateCartItem={updateCartItem}
                                             removeItem={removeItem}
+                                            updateItemPrice={updateItemPrice}
+                                            togglePack={togglePack}
                                         />
                                     ))}
                                 </div>

@@ -43,6 +43,8 @@ const EXPENSE_CATEGORIES = {
     UTILITIES: { label: "Коммунальные", color: "bg-yellow-500 hover:bg-yellow-600 text-black" }, // black text for yellow
     TAXES: { label: "Налоги", color: "bg-red-500 hover:bg-red-600" },
     OTHER: { label: "Прочее", color: "bg-gray-500 hover:bg-gray-600" },
+    PURCHASE: { label: "Закупка товара", color: "bg-violet-600 hover:bg-violet-700" },
+    purchase: { label: "Закупка товара", color: "bg-violet-600 hover:bg-violet-700" },
 }
 
 export default function ExpensesPage() {

@@ -14,20 +14,8 @@ export const useCartStore = create(
             clients: [],
             isLoadingData: false,
 
-            addItem: (product, { customPrice = null, isPack = false, packs = 0 } = {}) => {
+            addItem: (product) => {
                 const { items } = get();
-                // Create a unique ID for the cart item based on product ID AND its customization
-                // If we want to allow multiple rows for the same product with different prices, we need a unique cartItemId.
-                // However, the prompt implies "Cart Item Row" has these *inputs*, meaning the user edits them *in the row*.
-                // So `addItem` might just add the default, and then the row handles the editing?
-                // OR `addItem` takes these parameters if added from a specific context?
-                // Usually POS `addItem` just adds 1 unit. The requirements say "Cart Item Row: ... Unit Toggle ... Price Input".
-                // This implies the state lives in the cart item.
-
-                // Let's verify if we consolidate or separate. 
-                // "User can overwrite this." -> Implies modifying the item in the cart.
-                // So addItem usually just adds.
-
                 const existingItem = items.find((i) => i.id === product.id);
 
                 if (existingItem) {
@@ -35,7 +23,7 @@ export const useCartStore = create(
                         items: items.map((i) =>
                             i.id === product.id ? {
                                 ...i,
-                                quantity: i.quantity + (isPack ? (packs * (product.items_per_pack || 1)) : 1)
+                                quantity: i.quantity + 1 // Simply increment by 1 unit for now
                             } : i
                         ),
                     });
@@ -45,11 +33,11 @@ export const useCartStore = create(
                             ...items,
                             {
                                 ...product,
-                                quantity: isPack ? (packs * (product.items_per_pack || 1)) : 1,
                                 // Initialize defaults
-                                customPrice: customPrice !== null ? customPrice : product.sell_price, // Will be used as the actual price
-                                isPack: isPack,
-                                packsInput: packs || 0 // Store the pack input value for UI consistency if needed
+                                quantity: 1,
+                                sold_price: product.sell_price || 0, // ERROR FIX: Never undefined
+                                isPack: false,
+                                packsInput: 0
                             }
                         ]
                     });
@@ -70,9 +58,51 @@ export const useCartStore = create(
                 });
             },
 
+            // ACTION: Update Price
+            updateItemPrice: (productId, newPrice) => {
+                set({
+                    items: get().items.map((i) =>
+                        i.id === productId ? { ...i, sold_price: newPrice } : i
+                    ),
+                });
+            },
+
+            // ACTION: Toggle Pack
+            togglePack: (productId) => {
+                const item = get().items.find(i => i.id === productId);
+                if (!item) return;
+
+                const newIsPack = !item.isPack;
+                const itemsPerPack = item.items_per_pack || 1;
+
+                let newQuantity = item.quantity;
+                let newPacksInput = item.packsInput;
+
+                if (newIsPack) {
+                    // Switch TO Pack
+                    // Default to 1 pack if switching
+                    newPacksInput = 1;
+                    newQuantity = itemsPerPack;
+                } else {
+                    // Switch TO Unit
+                    // Keep current total quantity
+                    newPacksInput = 0;
+                    // newQuantity remains same
+                }
+
+                set({
+                    items: get().items.map((i) =>
+                        i.id === productId ? {
+                            ...i,
+                            isPack: newIsPack,
+                            packsInput: newPacksInput,
+                            quantity: newQuantity
+                        } : i
+                    ),
+                });
+            },
+
             updateQuantity: (productId, quantity) => {
-                // This might need to be deprecated or wrapped by updateCartItem if we move to full object updates
-                // But for compatibility with existing code:
                 if (quantity < 1) return;
                 set({
                     items: get().items.map((i) =>
@@ -89,8 +119,8 @@ export const useCartStore = create(
 
             getTotal: () => {
                 return get().items.reduce((total, item) => {
-                    const price = item.customPrice !== undefined ? item.customPrice : item.sell_price;
-                    return total + (price * item.quantity);
+                    // Use sold_price
+                    return total + ((item.sold_price || 0) * item.quantity);
                 }, 0);
             },
 
@@ -132,8 +162,8 @@ export const useCartStore = create(
                         items: items.map(item => ({
                             product_id: item.id,
                             quantity: item.quantity,
-                            price: item.customPrice !== undefined ? item.customPrice : item.sell_price,
-                            sold_price: item.customPrice !== undefined ? item.customPrice : item.sell_price, // Backend expects sold_price?
+                            price: item.sold_price, // Use sold_price
+                            sold_price: item.sold_price,
                         })),
                         client_id: selectedClient ? selectedClient.id : null,
                         paid_amount: Number(paidAmount) || getTotal()
@@ -153,15 +183,7 @@ export const useCartStore = create(
         }),
         {
             name: 'pos-cart-storage',
-            partialize: (state) => ({ items: state.items, selectedClient: state.selectedClient }), // Don't persist products/clients to keep data fresh on reload? Or should we?
-            // The prompt said "If products are already loaded, don't refetch automatically to save bandwidth". 
-            // If I don't persist them, they won't be "already loaded" on page refresh. 
-            // So likely I should persist them or at least let them be in memory. 
-            // If I don't persist them, `products` starts empty on refresh.
-            // But if I persist them, they might get stale. 
-            // Given the requirement "Optimization: If products are already loaded...", this usually implies within the session or if persisted.
-            // I'll stick to NOT persisting products/clients for now to ensure data freshness on full reload, 
-            // but the optimization applies if I navigate away and back.
+            partialize: (state) => ({ items: state.items, selectedClient: state.selectedClient }),
         }
     )
 );

@@ -43,7 +43,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogFooter, 
+    DialogFooter,
 } from "@/components/ui/dialog"
 import {
     Table,
@@ -468,22 +468,29 @@ export default function AnalyticsPage() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {expensesList.map((expense) => (
-                                                <TableRow key={expense.id}>
-                                                    <TableCell className="text-xs text-zinc-500 font-medium whitespace-nowrap">
-                                                        {new Date(expense.date).toLocaleDateString('ru-RU')}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="secondary" className="mb-1 text-[10px]">{expense.category}</Badge>
-                                                        <div className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-1">
-                                                            {expense.description}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-right font-bold text-red-600 dark:text-red-400">
-                                                        -{Math.abs(expense.amount)} c.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
+                                            {expensesList.map((expense) => {
+                                                const dateString = expense.date || expense.created_at;
+                                                const dateObj = new Date(dateString);
+                                                const isValidDate = !isNaN(dateObj.getTime());
+                                                const displayDate = isValidDate ? dateObj.toLocaleDateString('ru-RU') : "-";
+
+                                                return (
+                                                    <TableRow key={expense.id}>
+                                                        <TableCell className="text-xs text-zinc-500 font-medium whitespace-nowrap">
+                                                            {displayDate}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="secondary" className="mb-1 text-[10px]">{expense.category}</Badge>
+                                                            <div className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-1">
+                                                                {expense.description}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-bold text-red-600 dark:text-red-400">
+                                                            -{Math.abs(expense.amount)} c.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                         </TableBody>
                                     </Table>
                                 )
