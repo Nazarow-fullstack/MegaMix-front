@@ -13,7 +13,9 @@ import {
     ArrowUpRight,
     ArrowDownLeft,
     Lock,
-    Package
+    Package,
+    User,
+    ShieldCheck
 } from "lucide-react"
 
 import { useAuthStore } from "@/store/authStore"
@@ -408,21 +410,37 @@ export default function AnalyticsPage() {
                                                         </span>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <div className="font-medium text-sm text-zinc-800 dark:text-zinc-200">
-                                                            {sale.client_name || "Анонимный покупатель"}
-                                                        </div>
-                                                        <div className="text-xs text-zinc-500 flex flex-wrap gap-1 mt-1">
-                                                            {sale.items?.slice(0, 3).map((item, idx) => (
-                                                                <span key={idx} className="inline-flex items-center bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-[10px]">
-                                                                    <span className="font-medium text-zinc-700 dark:text-zinc-300 mr-1">
-                                                                        {item.product?.name || item.product_name || item.name || "Товар"}
-                                                                    </span>
-                                                                    <span className="text-zinc-400">x{item.quantity}</span>
+                                                        <div className="flex flex-col gap-1.5">
+                                                            {/* Buyer Info */}
+                                                            <div className="flex items-center gap-2">
+                                                                <User className="h-3.5 w-3.5 text-zinc-400" />
+                                                                <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
+                                                                    {sale.client_name ? sale.client_name : "Анонимный покупатель"}
                                                                 </span>
-                                                            )) || "—"}
-                                                            {(sale.items?.length || 0) > 3 && (
-                                                                <span className="text-[10px] text-zinc-400 self-center">+{sale.items.length - 3} еще...</span>
-                                                            )}
+                                                            </div>
+
+                                                            {/* Seller Info */}
+                                                            <div className="flex items-center gap-2 bg-violet-50 dark:bg-violet-900/10 w-fit px-2 py-0.5 rounded-md">
+                                                                <ShieldCheck className="h-3 w-3 text-violet-600 dark:text-violet-400" />
+                                                                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                                                                    Продал: <span className="font-semibold text-violet-700 dark:text-violet-300">{sale.seller_name}</span>
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Items Summary */}
+                                                            <div className="mt-1 text-xs text-zinc-400 pl-6 flex flex-wrap gap-1">
+                                                                {sale.items?.slice(0, 3).map((item, idx) => (
+                                                                    <span key={idx} className="inline-flex items-center bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-[10px]">
+                                                                        <span className="font-medium text-zinc-700 dark:text-zinc-300 mr-1">
+                                                                            {item.product?.name || item.product_name || item.name || "Товар"}
+                                                                        </span>
+                                                                        <span className="text-zinc-400">x{item.quantity}</span>
+                                                                    </span>
+                                                                )) || "—"}
+                                                                {(sale.items?.length || 0) > 3 && (
+                                                                    <span className="text-[10px] text-zinc-400 self-center">+{sale.items.length - 3} еще...</span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right font-medium">
@@ -561,8 +579,13 @@ export default function AnalyticsPage() {
                                 {selectedSale && new Date(selectedSale.created_at).toLocaleString('ru-RU')}
                             </span>
                         </DialogTitle>
-                        <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mt-2">
-                            {selectedSale?.client_name || "Анонимный покупатель"}
+                        <div className="flex justify-between items-center mt-2">
+                            <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                                {selectedSale?.client_name || "Анонимный покупатель"}
+                            </div>
+                            <div className="text-xs text-zinc-500">
+                                Кассир: <span className="font-bold text-zinc-700 dark:text-zinc-300">{selectedSale?.seller_name}</span>
+                            </div>
                         </div>
                     </DialogHeader>
 

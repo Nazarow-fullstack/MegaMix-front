@@ -25,52 +25,22 @@ import {
 import { Combobox } from "@/components/ui/combobox"
 import { Label } from "@/components/ui/label"
 
-function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice, togglePack }) {
-    // Local state for inputs to allow smooth typing
-    // We sync with store on blur or intentional actions
+function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice }) {
     const [priceInput, setPriceInput] = useState(item.sold_price?.toString() || "0")
 
-    // Derived state for the "Packs" logic
-    const isPack = item.isPack || false
-    const packsInput = item.packsInput || 0
-    const itemsPerPack = item.items_per_pack || 12 // Default to 12 if missing, or handle gracefully
+    // Derived state
+    const itemsPerPack = item.items_per_pack || 1
+    const isPackMode = itemsPerPack > 1
 
-    const handlePackToggle = (checked) => {
-        togglePack(item.id)
-    }
+    // Calculate display values
+    // If in pack mode, we show the number of packs (quantity / items per pack)
+    const displayQuantity = isPackMode ? (item.quantity / itemsPerPack) : item.quantity
 
-    const handlePacksChange = (e) => {
-        const val = e.target.value
-        const newPacks = parseInt(val)
-
-        // Update local UI state via store (since it drives the quantity)
-        if (!isNaN(newPacks) && newPacks >= 0) {
-            updateCartItem(item.id, {
-                packsInput: newPacks,
-                quantity: newPacks * itemsPerPack
-            })
-        }
-    }
-
-    const handleQuantityChange = (e) => {
-        // Only allowed if !isPack
-        const val = parseInt(e.target.value)
-        if (!isNaN(val) && val >= 0) {
-            updateCartItem(item.id, { quantity: val })
-        }
-    }
-
-    const handlePriceChange = (e) => {
-        setPriceInput(e.target.value)
-    }
-
+    const handlePriceChange = (e) => setPriceInput(e.target.value)
     const handlePriceBlur = () => {
         const val = parseFloat(priceInput)
-        if (!isNaN(val) && val >= 0) {
-            updateItemPrice(item.id, val)
-        } else {
-            setPriceInput(item.sold_price?.toString() || "0")
-        }
+        if (!isNaN(val) && val >= 0) updateItemPrice(item.id, val)
+        else setPriceInput(item.sold_price?.toString() || "0")
     }
 
     // Sync price input if store changes externally
@@ -80,112 +50,117 @@ function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice, toggle
 
     const totalRowPrice = (item.sold_price || 0) * item.quantity
 
+    const handleQuantityUpdate = (newVal) => {
+        if (isNaN(newVal) || newVal < 0) return
+
+        let finalQuantity = newVal
+        if (isPackMode) {
+            finalQuantity = newVal * itemsPerPack
+        }
+
+        updateCartItem(item.id, { quantity: finalQuantity })
+    }
+
     return (
-        <motion.div
-            layout
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className={`group flex flex-col gap-3 rounded-xl border p-4 shadow-sm transition-all 
-                ${isPack ? 'bg-violet-50/50 border-violet-100 dark:bg-violet-900/10 dark:border-violet-900/30' : 'bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-violet-500/30'}`}
-        >
-            {/* Header: Name and Remove */}
-            <div className="flex justify-between items-start gap-2">
+        <div className="group flex flex-col gap-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 shadow-sm hover:border-violet-500/30 transition-all">
+            {/* Top Row: Product Name & Trash */}
+            <div className="flex justify-between items-start gap-3">
                 <div className="flex-1">
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 leading-tight">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-tight">
                         {item.name}
                     </p>
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <div className="mt-1 flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-zinc-500 border-zinc-200 dark:border-zinc-700">
                             {item.unit || "шт"}
                         </Badge>
-                        {item.items_per_pack > 1 && (
-                            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
-                                В пачке: {item.items_per_pack}
-                            </Badge>
+                        {isPackMode && (
+                            <span className="text-[10px] text-zinc-400">
+                                {itemsPerPack} шт/уп
+                            </span>
                         )}
                     </div>
                 </div>
-                <Button size="icon" variant="ghost" className="h-6 w-6 text-zinc-400 hover:text-red-500 hover:bg-red-50 -mr-2" onClick={() => removeItem(item.id)}>
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 -mr-1"
+                    onClick={() => removeItem(item.id)}
+                >
                     <Trash2 className="h-4 w-4" />
                 </Button>
             </div>
 
-            <Separator className="bg-zinc-100 dark:bg-zinc-800/50" />
+            <Separator className="bg-zinc-100 dark:bg-zinc-800" />
 
-            {/* Controls Grid */}
-            <div className="grid grid-cols-2 gap-3">
-
-                {/* Left Col: Quantity Logic */}
-                <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                        <Checkbox
-                            id={`pack-check-${item.id}`}
-                            checked={isPack}
-                            onCheckedChange={handlePackToggle}
+            {/* Middle Row: Controls */}
+            <div className="flex items-center justify-between gap-3">
+                {/* Quantity Stepper */}
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5 h-9 w-fit">
+                        <button
+                            className="w-8 h-full flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-50 transition-colors"
+                            onClick={() => handleQuantityUpdate(Math.max(1, displayQuantity - 1))}
+                            disabled={displayQuantity <= 1}
+                        >
+                            <Minus className="h-4 w-4" />
+                        </button>
+                        <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700" />
+                        <input
+                            className="w-12 bg-transparent text-center text-sm font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            value={displayQuantity}
+                            onChange={(e) => handleQuantityUpdate(parseFloat(e.target.value))}
+                            type="number"
                         />
-                        <Label htmlFor={`pack-check-${item.id}`} className="text-xs font-medium cursor-pointer select-none">
-                            📦 Пачка?
-                        </Label>
+                        <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700" />
+                        <button
+                            className="w-8 h-full flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                            onClick={() => handleQuantityUpdate(displayQuantity + 1)}
+                        >
+                            <Plus className="h-4 w-4" />
+                        </button>
+
+                        {/* Unit Label Next to Input */}
+                        <div className="px-2 text-xs font-medium text-zinc-500 border-l border-zinc-200 dark:border-zinc-700 h-full flex items-center">
+                            {isPackMode ? "упак." : (item.unit || "шт.")}
+                        </div>
                     </div>
 
-                    {isPack ? (
-                        <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md p-1 pl-2">
-                                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Пачек:</span>
-                                <Input
-                                    className="h-6 w-full p-0 border-0 focus-visible:ring-0 text-right font-bold text-sm bg-transparent"
-                                    type="number"
-                                    min="1"
-                                    value={packsInput}
-                                    onChange={handlePacksChange}
-                                />
-                            </div>
-                            <div className="text-[10px] text-zinc-500 text-right px-1">
-                                {packsInput} x {itemsPerPack} = <b>{item.quantity}</b> {item.unit}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
-                            <Button size="icon" variant="ghost" className="h-7 w-8 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => updateCartItem(item.id, { quantity: Math.max(1, item.quantity - 1) })}>
-                                <Minus className="h-3 w-3" />
-                            </Button>
-                            <Input
-                                type="number"
-                                value={item.quantity}
-                                onChange={handleQuantityChange}
-                                className="w-full h-7 p-0 text-center text-sm font-bold bg-transparent border-0 focus-visible:ring-0 shadow-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <Button size="icon" variant="ghost" className="h-7 w-8 rounded-md bg-white dark:bg-zinc-700 shadow-sm" onClick={() => updateCartItem(item.id, { quantity: item.quantity + 1 })}>
-                                <Plus className="h-3 w-3" />
-                            </Button>
+                    {/* Helper Text for Packs */}
+                    {isPackMode && (
+                        <div className="text-[10px] text-zinc-400 pl-1">
+                            1 упак = {itemsPerPack} шт.
                         </div>
                     )}
                 </div>
+            </div>
 
-                {/* Right Col: Price Logic */}
-                <div className="space-y-2">
-                    <Label className="text-xs font-medium text-zinc-500 block text-right">
-                        Цена за шт.
-                    </Label>
-                    <div className="relative">
-                        <Input
-                            className="h-8 text-right pr-2 font-bold bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 focus:bg-white transition-colors"
-                            value={priceInput}
-                            onChange={handlePriceChange}
-                            onBlur={handlePriceBlur}
-                            type="number"
-                        />
+            {/* Bottom Row: Financials */}
+            <div className="flex items-center justify-between pt-1">
+                {/* Price Input */}
+                <div className="flex items-center gap-2 relative">
+                    <span className="text-[10px] text-zinc-400 font-medium">
+                        Price:
+                    </span>
+                    <Input
+                        className="h-7 w-20 px-1 py-0 text-right text-sm font-bold bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 focus-visible:ring-violet-500/30"
+                        value={priceInput}
+                        onChange={handlePriceChange}
+                        onBlur={handlePriceBlur}
+                        type="number"
+                    />
+                </div>
+
+                {/* Subtotal & Total */}
+                <div className="text-right">
+                    <div className="text-[10px] text-zinc-400 font-medium mb-0.5">
+                        {item.quantity} шт × {item.sold_price || 0}
                     </div>
-                    <div className="text-right">
-                        <span className="text-xs text-zinc-400">Итого: </span>
-                        <span className="font-black text-sm text-violet-600 dark:text-violet-400">
-                            {totalRowPrice.toFixed(0)} c.
-                        </span>
+                    <div className="font-black text-violet-600 dark:text-violet-400 text-lg leading-none">
+                        {totalRowPrice.toFixed(0)} <span className="text-xs font-bold opacity-70">c.</span>
                     </div>
                 </div>
             </div>
-        </motion.div>
+        </div>
     )
 }
 

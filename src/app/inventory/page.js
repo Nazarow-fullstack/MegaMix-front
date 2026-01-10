@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query" // turbo
 import { Plus, Search, Loader2, RefreshCcw, Pencil, Trash } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 
 import { useAuthStore } from "@/store/authStore"
 import { useProductStore } from "@/store/productStore"
@@ -101,6 +102,7 @@ export default function InventoryPage() {
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isDeleteOpen, setIsDeleteOpen] = useState(false)
     const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+    const [isAddPack, setIsAddPack] = useState(false)
 
     // Selection State
     const [selectedProduct, setSelectedProduct] = useState(null)
@@ -169,7 +171,7 @@ export default function InventoryPage() {
             buy_price: parseFloat(formData.get("buy_price") || 0),
             sell_price: parseFloat(formData.get("buy_price") || 0), // Dynamic pricing now, initial sell price = buy price
             min_stock_level: parseInt(formData.get("min_stock_level") || 0),
-            items_per_pack: parseInt(formData.get("items_per_pack") || 1),
+            items_per_pack: isAddPack ? parseInt(formData.get("items_per_pack") || 1) : 1,
             quantity: 0
         })
     }
@@ -197,7 +199,6 @@ export default function InventoryPage() {
             name: formData.get("name"),
             unit: formData.get("unit"),
             buy_price: parseFloat(formData.get("buy_price") || 0),
-            sell_price: parseFloat(formData.get("buy_price") || 0),
             min_stock_level: parseInt(formData.get("min_stock_level") || 0),
             items_per_pack: parseInt(formData.get("items_per_pack") || 1),
         })
@@ -401,19 +402,40 @@ export default function InventoryPage() {
                                     </Select>
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="items_per_pack">шт/уп</Label>
-                                    <Input id="items_per_pack" name="items_per_pack" type="number" defaultValue="1" className="bg-zinc-50 dark:bg-zinc-900" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
                                     <Label htmlFor="min_stock_level">Мин. остаток</Label>
                                     <Input id="min_stock_level" name="min_stock_level" type="number" defaultValue="10" className="bg-zinc-50 dark:bg-zinc-900" />
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="buy_price">Цена закупки</Label>
-                                    <Input id="buy_price" name="buy_price" type="number" step="0.01" className="bg-zinc-50 dark:bg-zinc-900" />
+                            </div>
+
+                            <div className="flex items-center gap-2 border border-zinc-200 dark:border-zinc-800 p-3 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50">
+                                <Switch
+                                    id="is_pack"
+                                    checked={isAddPack}
+                                    onCheckedChange={setIsAddPack}
+                                />
+                                <Label htmlFor="is_pack" className="cursor-pointer text-sm font-medium flex-1">
+                                    Продается упаковками?
+                                </Label>
+                            </div>
+
+                            {isAddPack && (
+                                <div className="grid gap-2 animate-in fade-in slide-in-from-top-1">
+                                    <Label htmlFor="items_per_pack">Количество в упаковке (шт/уп)</Label>
+                                    <Input
+                                        id="items_per_pack"
+                                        name="items_per_pack"
+                                        type="number"
+                                        defaultValue="1"
+                                        min="2"
+                                        required={isAddPack}
+                                        className="bg-zinc-50 dark:bg-zinc-900"
+                                    />
                                 </div>
+                            )}
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="buy_price">Цена закупки (за единицу)</Label>
+                                <Input id="buy_price" name="buy_price" type="number" step="0.01" className="bg-zinc-50 dark:bg-zinc-900" />
                             </div>
 
                         </div>
@@ -496,7 +518,7 @@ export default function InventoryPage() {
                                         </Select>
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="edit-items_per_pack">шт/уп</Label>
+                                        <Label htmlFor="edit-items_per_pack">шт/уп (В пачке)</Label>
                                         <Input id="edit-items_per_pack" name="items_per_pack" type="number" defaultValue={productToEdit.items_per_pack || 1} className="bg-zinc-50 dark:bg-zinc-900" />
                                     </div>
                                 </div>
@@ -510,7 +532,6 @@ export default function InventoryPage() {
                                         <Input id="edit-buy_price" name="buy_price" type="number" step="0.01" defaultValue={productToEdit.buy_price} className="bg-zinc-50 dark:bg-zinc-900" />
                                     </div>
                                 </div>
-
                             </div>
                             <DialogFooter>
                                 <Button type="submit" disabled={updateProductMutation.isPending} className="bg-violet-600 hover:bg-violet-700 text-white">
