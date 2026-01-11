@@ -1,11 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Search, Loader2, ShoppingCart, Trash2, Plus, Minus, CreditCard, RefreshCcw, Grid, Package, AlertCircle, Wallet } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { Send, User } from "lucide-react"
 
 import { useAuthStore } from "@/store/authStore"
 import { useCartStore } from "@/store/cartStore"
+import { useChatStore } from "@/store/chatStore"
+import { useUserStore } from "@/store/userStore"
 
 import { Button } from "@/components/ui/button"
 import PaginationControls from "@/components/ui/PaginationControls"
@@ -165,6 +169,7 @@ function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice }) {
 }
 
 export default function SalesPage() {
+    const queryClient = useQueryClient()
     const { user, isLoading: isAuthLoading } = useAuthStore()
     const {
         items,
@@ -191,14 +196,17 @@ export default function SalesPage() {
     const [checkoutResult, setCheckoutResult] = useState(null)
 
     // Pagination
+    const [lastSaleDetails, setLastSaleDetails] = useState(null)
     const [page, setPage] = useState(1)
     const limit = 8
 
     useEffect(() => {
+        // Refresh products on mount to avoid stale stock data
+        queryClient.invalidateQueries(['products'])
         fetchCatalog({ page, limit })
-    }, [page, fetchCatalog])
+    }, [page, fetchCatalog, queryClient])
 
-    // Hydration Guard
+    // ... hydration guard ...
     if (!user || isAuthLoading) {
         return (
             <div className="flex items-center justify-center h-screen bg-zinc-950">
@@ -214,8 +222,13 @@ export default function SalesPage() {
     const handleCheckout = async () => {
         const result = await checkout(paidAmount || getTotal());
         if (result.success) {
+            // CRITICAL: Set the details from the BACKEND response, not the local cart
+            setLastSaleDetails(result.data);
+
             setCheckoutResult({ success: true, message: "Продажа успешно оформлена!" });
             setPaidAmount("");
+            // Invalidate again to update stock after sale
+            queryClient.invalidateQueries(['products'])
         } else {
             setCheckoutResult({ success: false, message: result.error });
         }
@@ -226,7 +239,6 @@ export default function SalesPage() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-3rem)] lg:flex-row gap-4 overflow-hidden bg-zinc-50 dark:bg-zinc-950 p-2 lg:p-4">
-
             {/* Mobile Tab Switcher */}
             <div className="lg:hidden flex w-full bg-zinc-100 dark:bg-zinc-900 rounded-lg p-1 shrink-0 mb-2">
                 <button
@@ -484,7 +496,14 @@ export default function SalesPage() {
             </div >
 
             {/* Result Dialog */}
-            < Dialog open={!!checkoutResult} onOpenChange={() => setCheckoutResult(null)}>
+            <Dialog open={!!checkoutResult} onOpenChange={() => {
+                if (checkoutResult?.success) {
+                    // Only allow closing if we are done or if user explicitly wants to
+                    setCheckoutResult(null)
+                } else {
+                    setCheckoutResult(null)
+                }
+            }}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className={checkoutResult?.success ? "text-emerald-600" : "text-red-600"}>
@@ -494,14 +513,122 @@ export default function SalesPage() {
                             {checkoutResult?.message}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="flex justify-end">
-                        <Button onClick={() => setCheckoutResult(null)} variant={checkoutResult?.success ? "default" : "secondary"}>
-                            Закрыть
-                        </Button>
-                    </div>
+
+                    {checkoutResult?.success && (
+                        <div className="flex flex-col gap-3 py-4">
+                            <ForwardReceiptDialog
+                                receiptData={lastSaleDetails}
+                                onClose={() => setCheckoutResult(null)}
+                            />
+                        </div>
+                    )}
+
+                    {!checkoutResult?.success && (
+                        <div className="flex justify-end">
+                            <Button onClick={() => setCheckoutResult(null)} variant="secondary">
+                                Закрыть
+                            </Button>
+                        </div>
+                    )}
                 </DialogContent>
-            </Dialog >
+            </Dialog>
 
         </div >
+    )
+}
+
+function ForwardReceiptDialog({ receiptData, onClose }) {
+    const [isOpen, setIsOpen] = useState(false)
+    const { users, fetchUsers } = useUserStore()
+    const { user } = useAuthStore()
+    const { sendMessage } = useChatStore()
+    const [selectedUser, setSelectedUser] = useState(null)
+    const [isLoading, setIsLoading] = useState(false)
+
+    useEffect(() => {
+        fetchUsers()
+    }, [fetchUsers])
+
+    const handleSend = async () => {
+        setIsLoading(true)
+        const receiptContent = {
+            title: "Чек продажи",
+            total: receiptData.total,
+            itemsCount: receiptData.items.length,
+            items: receiptData.items.map(i => ({
+                name: i.name,
+                quantity: i.quantity,
+                price: i.sold_price || i.price || 0
+            })),
+            client: receiptData.client ? receiptData.client.full_name : "Аноним",
+            date: receiptData.date
+        }
+
+        console.log("SENDING RECEIPT DATA:", receiptContent)
+
+        // We are sending a 'RECEIPT' type message
+        // If we select a user, we temporarily switch active chat or just send it (need logic in store usually)
+        // For simplicity, we assume we want to send it to the selected user.
+        // But our store currently sends to `activeChat`. 
+        // We might want to switch chat context or update store to accept recipient.
+        // For this demo, let's assume we send to 'general' if no user selected, or specific user.
+
+        // Hack: temporarily set active chat to target (in a real app, sendMessage should take recipient)
+        const targetChat = selectedUser || 'general';
+        useChatStore.getState().setActiveChat(targetChat);
+
+        await sendMessage(JSON.stringify(receiptContent), 'RECEIPT');
+
+        setIsLoading(false)
+        setIsOpen(false)
+        onClose() // Close the main success dialog too
+    }
+
+    if (!isOpen) {
+        return (
+            <Button onClick={() => setIsOpen(true)} className="w-full gap-2" variant="outline">
+                <Send className="w-4 h-4" />
+                Отправить чек в чат
+            </Button>
+        )
+    }
+
+    return (
+        <div className="flex flex-col gap-3 bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+            <Label>Выберите получателя:</Label>
+            <ScrollArea className="h-40 border rounded-md bg-white dark:bg-zinc-900">
+                <div className="p-2 space-y-1">
+                    <button
+                        className={`w-full flex items-center gap-2 p-2 rounded-md text-sm transition-colors ${!selectedUser ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                        onClick={() => setSelectedUser(null)}
+                    >
+                        <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+                            #
+                        </div>
+                        <span className="font-medium">Общий чат</span>
+                    </button>
+
+                    {users.filter(u => u.id !== user?.id).map(u => (
+                        <button
+                            key={u.id}
+                            className={`w-full flex items-center gap-2 p-2 rounded-md text-sm transition-colors ${selectedUser === u.id ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                            onClick={() => setSelectedUser(u.id)}
+                        >
+                            <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
+                                <User className="w-4 h-4" />
+                            </div>
+                            <span className="font-medium">{u.username || u.full_name}</span>
+                        </button>
+                    ))}
+                </div>
+            </ScrollArea>
+            <div className="flex gap-2">
+                <Button variant="ghost" className="flex-1" onClick={() => setIsOpen(false)}>Отмена</Button>
+                <Button className="flex-1" onClick={handleSend} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                    Отправить
+                </Button>
+            </div>
+        </div>
     )
 }

@@ -9,6 +9,7 @@ import {
     Briefcase,
     DollarSign,
     Users,
+    MessageSquare,
 } from "lucide-react"
 
 import { ThemeToggle } from "@/components/ThemeToggle"
@@ -21,6 +22,7 @@ const menuItems = [
     { href: "/analytics", label: "Аналитика", icon: BarChart3, roles: ["admin", "manager"] },
     { href: "/expenses", label: "Расходы", icon: Briefcase, roles: ["admin", "manager"] },
     { href: "/users", label: "Сотрудники", icon: Baby, roles: ["admin"] },
+    { href: "/chat", label: "Сообщения", icon: MessageSquare, roles: ["admin", "manager", "worker"] },
 ]
 
 export function Sidebar({ setOpen }) {

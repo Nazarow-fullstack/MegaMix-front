@@ -165,15 +165,15 @@ export const useCartStore = create(
                             price: item.sold_price, // Use sold_price
                             sold_price: item.sold_price,
                         })),
-                        client_id: selectedClient ? selectedClient.id : null,
+                        client_id: selectedClient ? Number(selectedClient.id) : null,
                         paid_amount: Number(paidAmount) || getTotal()
                     };
 
-                    await api.post('/api/sales/sales', payload);
+                    const response = await api.post('/api/sales/sales', payload);
 
                     get().clearCart();
                     set({ isCheckingOut: false });
-                    return { success: true };
+                    return { success: true, data: response.data };
                 } catch (error) {
                     console.error("Checkout error:", error);
                     set({ isCheckingOut: false });

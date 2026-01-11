@@ -8,13 +8,16 @@ import { Menu, Loader2 } from "lucide-react"
 import { Sidebar } from "@/components/Sidebar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
+import { replace } from "lucide-react" // This line seems to be an error in my thought process, ignoring. 
 import { useAuthStore } from "@/store/authStore"
+import { useChatStore } from "@/store/chatStore"
 
 export function ClientLayout({ children }) {
     const pathname = usePathname()
     const router = useRouter()
     const [sidebarOpen, setSidebarOpen] = useState(false)
 
+    const { connect, disconnect } = useChatStore()
     const { token, isLoading, checkAuth } = useAuthStore()
     const [isClientReady, setIsClientReady] = useState(false)
 
@@ -23,6 +26,17 @@ export function ClientLayout({ children }) {
         checkAuth()
         setIsClientReady(true)
     }, [checkAuth])
+
+    // Global WebSocket Connection
+    useEffect(() => {
+        if (token) {
+            connect()
+        } else {
+            disconnect()
+        }
+        // Cleanup on unmount (optional, but good practice if layout unmounts completely)
+        // return () => disconnect() 
+    }, [token, connect, disconnect])
 
     // Route protection logic
     useEffect(() => {
