@@ -219,16 +219,26 @@ export default function SalesPage() {
         p.name.toLowerCase().includes(search.toLowerCase())
     )
 
-    const handleCheckout = async () => {
+const handleCheckout = async () => {
+        // 1. Запоминаем клиента ПЕРЕД тем, как стор очистится
+        const currentClient = useCartStore.getState().selectedClient;
+        const clientName = currentClient ? currentClient.label : "Анонимный покупатель";
+
         const result = await checkout(paidAmount || getTotal());
+        
         if (result.success) {
-            // CRITICAL: Set the details from the BACKEND response, not the local cart
-            setLastSaleDetails(result.data);
+            // 2. Берем ответ от бэка, но если там нет имени клиента, вставляем наше
+            const saleData = {
+                ...result.data,
+                client_name: result.data.client_name || clientName
+            };
+
+            // 3. Сохраняем этот "полный" чек для диалога
+            setLastSaleDetails(saleData);
 
             setCheckoutResult({ success: true, message: "Продажа успешно оформлена!" });
             setPaidAmount("");
-            // Invalidate again to update stock after sale
-            queryClient.invalidateQueries(['products'])
+            queryClient.invalidateQueries(['products']);
         } else {
             setCheckoutResult({ success: false, message: result.error });
         }
@@ -542,6 +552,7 @@ function ForwardReceiptDialog({ receiptData, onClose }) {
     const { users, fetchUsers } = useUserStore()
     const { user } = useAuthStore()
     const { sendMessage } = useChatStore()
+    const { selectedClient } = useCartStore()
     const [selectedUser, setSelectedUser] = useState(null)
     const [isLoading, setIsLoading] = useState(false)
 
@@ -551,33 +562,31 @@ function ForwardReceiptDialog({ receiptData, onClose }) {
 
     const handleSend = async () => {
         setIsLoading(true)
-        const receiptContent = {
-            title: "Чек продажи",
-            total: receiptData.total,
-            itemsCount: receiptData.items.length,
-            items: receiptData.items.map(i => ({
-                name: i.name,
-                quantity: i.quantity,
-                price: i.sold_price || i.price || 0
-            })),
-            client: receiptData.client ? receiptData.client.full_name : "Аноним",
-            date: receiptData.date
-        }
 
-        console.log("SENDING RECEIPT DATA:", receiptContent)
+        // Standardized Receipt Object construction
+        const receiptPayload = {
+            id: receiptData.id,
+            date: new Date().toISOString(),
+            // Logic: If client exists, use full_name, else "Анонимный покупатель"
+            client_name: receiptData.client ? receiptData.client.full_name : (selectedClient ? selectedClient.label : "Анонимный покупатель"),
+            // Ensure total is a number
+            total_amount: Number(receiptData.total_amount || receiptData.total || 0),
+            items: (receiptData.items || []).map(item => ({
+                // Handle different possible structures (backend response vs local cart)
+                product_name: item.product?.name || item.name || "Товар",
+                quantity: item.quantity,
+                unit: item.product?.unit || item.unit || "шт",
+                price: item.price || item.sold_price || 0
+            }))
+        };
 
-        // We are sending a 'RECEIPT' type message
-        // If we select a user, we temporarily switch active chat or just send it (need logic in store usually)
-        // For simplicity, we assume we want to send it to the selected user.
-        // But our store currently sends to `activeChat`. 
-        // We might want to switch chat context or update store to accept recipient.
-        // For this demo, let's assume we send to 'general' if no user selected, or specific user.
+        console.log("SENDING STANDARD RECEIPT:", receiptPayload)
 
         // Hack: temporarily set active chat to target (in a real app, sendMessage should take recipient)
         const targetChat = selectedUser || 'general';
         useChatStore.getState().setActiveChat(targetChat);
 
-        await sendMessage(JSON.stringify(receiptContent), 'RECEIPT');
+        await sendMessage(JSON.stringify(receiptPayload), 'RECEIPT');
 
         setIsLoading(false)
         setIsOpen(false)

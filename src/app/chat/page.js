@@ -400,11 +400,15 @@ function ReceiptBubble({ content, isMe }) {
         return <p className="text-red-500 text-xs p-2">Invalid Receipt Data</p>;
     }
 
-    // Fallback values
-    const total = data.total || data.total_amount || 0;
+    // Standardize data consumption (handle multiple possible legacy formats)
+    const total = data.total_amount || data.total || 0;
     const items = data.items || [];
-    const clientName = data.client || 'Гость';
+    // Prioritize new field 'client_name', fallback to 'client' or default
+    const clientName = data.client_name || data.client || 'Гость';
     const dateStr = data.date ? new Date(data.date).toLocaleDateString() : 'N/A';
+
+    // Calculate items count if not provided directly
+    const itemsCount = data.itemsCount || items.length;
 
     return (
         <div className={classNames(
@@ -431,24 +435,31 @@ function ReceiptBubble({ content, isMe }) {
             </div>
 
             <div className="space-y-1.5 mb-3">
-                {items.length > 0 ? items.slice(0, 3).map((item, i) => (
-                    <div key={i} className={classNames("text-xs flex justify-between gap-2", isMe ? "text-violet-50" : "text-zinc-600 dark:text-zinc-300")}>
-                        <span className="truncate flex-1">
-                            {typeof item === 'string' ? item : `${item.name} x${item.quantity}`}
-                        </span>
-                        {typeof item !== 'string' && (
-                            <span className="whitespace-nowrap opacity-70 font-medium">
-                                {(item.price * item.quantity).toFixed(0)} c.
+                {items.length > 0 ? items.slice(0, 3).map((item, i) => {
+                    // Normalize item fields
+                    const itemName = item.product_name || item.name || "Товар";
+                    const itemQty = item.quantity || 1;
+                    const itemPrice = item.price || item.sold_price || 0;
+
+                    return (
+                        <div key={i} className={classNames("text-xs flex justify-between gap-2", isMe ? "text-violet-50" : "text-zinc-600 dark:text-zinc-300")}>
+                            <span className="truncate flex-1">
+                                {typeof item === 'string' ? item : `${itemName} x${itemQty}`}
                             </span>
-                        )}
-                    </div>
-                )) : (
+                            {typeof item !== 'string' && (
+                                <span className="whitespace-nowrap opacity-70 font-medium">
+                                    {(itemPrice * itemQty).toFixed(0)} c.
+                                </span>
+                            )}
+                        </div>
+                    )
+                }) : (
                     <p className="text-[10px] opacity-70 italic text-center">Нет товаров</p>
                 )}
 
-                {(data.itemsCount > 3 || items.length > 3) && (
+                {(itemsCount > 3) && (
                     <p className="text-[10px] opacity-60 italic text-center mt-1">
-                        + еще {Math.max(0, (data.itemsCount || items.length) - 3)} поз.
+                        + еще {Math.max(0, itemsCount - 3)} поз.
                     </p>
                 )}
             </div>
