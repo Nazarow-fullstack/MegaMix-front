@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query" // turbo
 import { Plus, Search, Loader2, RefreshCcw, Pencil, Trash } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 
 import { useAuthStore } from "@/store/authStore"
 import { useProductStore } from "@/store/productStore"
@@ -101,6 +102,7 @@ export default function InventoryPage() {
     const [isMoveStockOpen, setIsMoveStockOpen] = useState(false)
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+    const [isMoveStockPack, setIsMoveStockPack] = useState(false)
     const [isDetailsOpen, setIsDetailsOpen] = useState(false)
     const [isAddPack, setIsAddPack] = useState(false)
 
@@ -179,10 +181,23 @@ export default function InventoryPage() {
     const handleMoveStock = (e) => {
         e.preventDefault()
         const formData = new FormData(e.target)
+
+        let totalQuantity = 0
+
+        if (isMoveStockPack && selectedProduct?.items_per_pack) {
+            const packs = parseFloat(formData.get("packs") || 0)
+            const units = parseFloat(formData.get("quantity") || 0) // Treat 'quantity' as extra units in this mode
+            totalQuantity = (packs * selectedProduct.items_per_pack) + units
+        } else {
+            totalQuantity = parseFloat(formData.get("quantity") || 0)
+        }
+
+        if (totalQuantity <= 0) return; // Basic validation
+
         moveStockMutation.mutate({
             product_id: parseInt(Number(selectedProduct.id)),
             type: String(formData.get("type")).toLowerCase(),
-            change_amount: parseFloat(formData.get("quantity")),
+            change_amount: totalQuantity,
             comment: String(formData.get("comment") || ""),
         })
     }
@@ -260,8 +275,9 @@ export default function InventoryPage() {
                             <TableHead>Название</TableHead>
                             <TableHead>Ед. изм.</TableHead>
                             <TableHead>В пачке</TableHead>
+                            <TableHead>Упаковок</TableHead>
                             <TableHead>Остаток</TableHead>
-                            {isAdmin && <TableHead>Закупка</TableHead>}
+                            {canSeePrices && <TableHead>Закупка</TableHead>}
                             {/* {canSeePrices && <TableHead>Продажа</TableHead>} - Removed */}
                             <TableHead className="text-right">Действия</TableHead>
                         </TableRow>
@@ -291,7 +307,7 @@ export default function InventoryPage() {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            products.map((product) => {
+                            [...products].sort((a, b) => a.id - b.id).map((product) => {
                                 const isLowStock = product.quantity <= product.min_stock_level
                                 return (
                                     <TableRow
@@ -307,6 +323,11 @@ export default function InventoryPage() {
                                         <TableCell>{product.unit}</TableCell>
                                         <TableCell>{product.items_per_pack || 1} шт/уп</TableCell>
                                         <TableCell>
+                                            <span className="text-zinc-500 dark:text-zinc-400">
+                                                {Math.floor(product.quantity / (product.items_per_pack || 1))} уп.
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
                                             <div className="flex items-center gap-3">
                                                 <span className={`text-xl font-black ${isLowStock ? "text-red-600 dark:text-red-400" : "text-zinc-900 dark:text-zinc-100"}`}>
                                                     {product.quantity}
@@ -317,7 +338,7 @@ export default function InventoryPage() {
                                                 </div>
                                             </div>
                                         </TableCell>
-                                        {isAdmin && <TableCell>{product.buy_price} ₽</TableCell>}
+                                        {canSeePrices && <TableCell>{product.buy_price} с.</TableCell>}
                                         {/* Sell Price Removed per requirements, canSeePrices no longer shows it here */}
                                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex items-center justify-end gap-1">
@@ -327,6 +348,7 @@ export default function InventoryPage() {
                                                         size="icon"
                                                         onClick={() => {
                                                             setSelectedProduct(product)
+                                                            setIsMoveStockPack(false)
                                                             setIsMoveStockOpen(true)
                                                         }}
                                                         title="Движение товара"
@@ -470,10 +492,49 @@ export default function InventoryPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="quantity">Количество</Label>
-                                <Input id="quantity" name="quantity" type="number" required min="1" className="bg-zinc-50 dark:bg-zinc-900" />
-                            </div>
+
+                            {/* Pack Mode Toggle */}
+                            {(selectedProduct?.items_per_pack || 0) > 1 && (
+                                <div className="flex items-center space-x-2 border p-3 rounded-md bg-zinc-50 dark:bg-zinc-900/50">
+                                    <Checkbox
+                                        id="pack-mode"
+                                        checked={isMoveStockPack}
+                                        onCheckedChange={setIsMoveStockPack}
+                                    />
+                                    <div className="grid gap-1.5 leading-none">
+                                        <label
+                                            htmlFor="pack-mode"
+                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                        >
+                                            Движение упаковками + штучно
+                                        </label>
+                                        <p className="text-xs text-zinc-500">
+                                            {isMoveStockPack
+                                                ? `Введите кол-во упаковок и/или штук`
+                                                : `В упаковке: ${selectedProduct.items_per_pack} шт.`
+                                            }
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {isMoveStockPack ? (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="packs">Упаковок ({selectedProduct?.items_per_pack} шт/уп)</Label>
+                                        <Input id="packs" name="packs" type="number" min="0" placeholder="0" className="bg-zinc-50 dark:bg-zinc-900" />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="quantity">Штук (дополнительно)</Label>
+                                        <Input id="quantity" name="quantity" type="number" min="0" placeholder="0" className="bg-zinc-50 dark:bg-zinc-900" />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="quantity">Количество</Label>
+                                    <Input id="quantity" name="quantity" type="number" required min="1" className="bg-zinc-50 dark:bg-zinc-900" />
+                                </div>
+                            )}
                             <div className="grid gap-2">
                                 <Label htmlFor="comment">Комментарий</Label>
                                 <Input id="comment" name="comment" className="bg-zinc-50 dark:bg-zinc-900" />

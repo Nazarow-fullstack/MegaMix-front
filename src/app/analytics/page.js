@@ -15,14 +15,18 @@ import {
     Lock,
     Package,
     User,
-    ShieldCheck
+    ShieldCheck,
+    Send
 } from "lucide-react"
 
 import { useAuthStore } from "@/store/authStore"
+import { useChatStore } from "@/store/chatStore"
+import { useUserStore } from "@/store/userStore"
 import api from "@/utils/axios"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
 import {
     Select,
     SelectContent,
@@ -624,8 +628,109 @@ export default function AnalyticsPage() {
                             {formatMoney(selectedSale?.total_amount)}
                         </span>
                     </div>
+
+                    {selectedSale && (
+                        <ForwardReceiptDialog
+                            receiptData={selectedSale}
+                            onClose={() => setSelectedSale(null)}
+                        />
+                    )}
                 </DialogContent>
             </Dialog>
+        </div>
+    )
+}
+
+function ForwardReceiptDialog({ receiptData, onClose }) {
+    const [isOpen, setIsOpen] = useState(false)
+    const { users, fetchUsers } = useUserStore()
+    const { user } = useAuthStore()
+    const { sendMessage } = useChatStore()
+    const [selectedUser, setSelectedUser] = useState(null)
+    const [isLoading, setIsLoading] = useState(false)
+
+    // Ensure users are loaded
+    useState(() => {
+        fetchUsers()
+    }, [])
+
+    const handleSend = async () => {
+        setIsLoading(true)
+
+        // Standardized Receipt Object construction
+        const receiptPayload = {
+            id: receiptData.id,
+            date: receiptData.created_at || new Date().toISOString(),
+            // Logic: Use existing names or fallbacks
+            client_name: receiptData.client_name || "Анонимный покупатель",
+            // Ensure total is a number
+            total_amount: Number(receiptData.total_amount || receiptData.total || 0),
+            items: (receiptData.items || []).map(item => ({
+                product_name: item.product?.name || item.product_name || item.name || "Товар",
+                quantity: item.quantity,
+                unit: item.product?.unit || item.unit || "шт",
+                price: item.price || item.sold_price || 0
+            }))
+        };
+
+        // Hack: temporarily set active chat to target
+        const targetChat = selectedUser || 'general';
+        useChatStore.getState().setActiveChat(targetChat);
+
+        await sendMessage(JSON.stringify(receiptPayload), 'RECEIPT');
+
+        setIsLoading(false)
+        setIsOpen(false)
+        if (onClose) onClose()
+    }
+
+    if (!isOpen) {
+        return (
+            <div className="w-full mt-4 border-t border-zinc-100 dark:border-zinc-800 pt-4">
+                <Button onClick={() => setIsOpen(true)} className="w-full gap-2 bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/40" variant="ghost">
+                    <Send className="w-4 h-4" />
+                    Переслать чек в чат
+                </Button>
+            </div>
+        )
+    }
+
+    return (
+        <div className="w-full mt-4 border-t border-zinc-100 dark:border-zinc-800 pt-4 flex flex-col gap-3">
+            <Label className="text-xs font-semibold text-zinc-500">Выберите получателя:</Label>
+            <ScrollArea className="h-40 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-zinc-50/50 dark:bg-zinc-900/50">
+                <div className="p-2 space-y-1">
+                    <button
+                        className={`w-full flex items-center gap-2 p-2 rounded-md text-sm transition-colors ${!selectedUser ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                        onClick={() => setSelectedUser(null)}
+                    >
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 flex items-center justify-center text-white">
+                            #
+                        </div>
+                        <span className="font-medium">Общий чат</span>
+                    </button>
+
+                    {users.filter(u => u.id !== user?.id).map(u => (
+                        <button
+                            key={u.id}
+                            className={`w-full flex items-center gap-2 p-2 rounded-md text-sm transition-colors ${selectedUser === u.id ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                            onClick={() => setSelectedUser(u.id)}
+                        >
+                            <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
+                                <User className="w-4 h-4 text-zinc-500" />
+                            </div>
+                            <span className="font-medium text-zinc-700 dark:text-zinc-300">{u.username || u.full_name}</span>
+                        </button>
+                    ))}
+                </div>
+            </ScrollArea>
+            <div className="flex gap-2">
+                <Button variant="ghost" className="flex-1" onClick={() => setIsOpen(false)}>Отмена</Button>
+                <Button className="flex-1 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleSend} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                    Отправить
+                </Button>
+            </div>
         </div>
     )
 }

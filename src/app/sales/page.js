@@ -29,16 +29,22 @@ import {
 import { Combobox } from "@/components/ui/combobox"
 import { Label } from "@/components/ui/label"
 
-function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice }) {
+function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice, togglePack }) {
     const [priceInput, setPriceInput] = useState(item.sold_price?.toString() || "0")
 
     // Derived state
     const itemsPerPack = item.items_per_pack || 1
-    const isPackMode = itemsPerPack > 1
+    // It is "pack mode" ONLY if the product has packs AND the user checked the box (item.isPack)
+    // We expect item.isPack to be boolean from the store.
+    const isPackEligible = itemsPerPack > 1
+    const isPackActive = isPackEligible && item.isPack
 
     // Calculate display values
     // If in pack mode, we show the number of packs (quantity / items per pack)
-    const displayQuantity = isPackMode ? (item.quantity / itemsPerPack) : item.quantity
+    // If not in pack mode (units), we show raw quantity.
+    const displayQuantity = isPackActive ? (item.quantity / itemsPerPack) : item.quantity
+
+    const [qtyInput, setQtyInput] = useState(displayQuantity.toString())
 
     const handlePriceChange = (e) => setPriceInput(e.target.value)
     const handlePriceBlur = () => {
@@ -52,17 +58,44 @@ function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice }) {
         setPriceInput(item.sold_price?.toString() || "0")
     }, [item.sold_price])
 
+    // Sync quantity input if store changes externally (e.g. from +/- buttons or pack toggle)
+    useEffect(() => {
+        setQtyInput(displayQuantity.toString())
+    }, [displayQuantity])
+
     const totalRowPrice = (item.sold_price || 0) * item.quantity
 
     const handleQuantityUpdate = (newVal) => {
+        // If triggered by buttons, newVal is a number called with displayQuantity +/- 1
+        // If triggered by input, we might get direct value or handle via handleQuantityInputChange
+
         if (isNaN(newVal) || newVal < 0) return
 
         let finalQuantity = newVal
-        if (isPackMode) {
+        if (isPackActive) {
             finalQuantity = newVal * itemsPerPack
         }
 
         updateCartItem(item.id, { quantity: finalQuantity })
+    }
+
+    const handleQuantityInputChange = (val) => {
+        setQtyInput(val)
+        const parsed = parseFloat(val)
+        if (!isNaN(parsed) && parsed >= 0) {
+            handleQuantityUpdate(parsed)
+        }
+    }
+
+    const handleQuantityInputBlur = () => {
+        const parsed = parseFloat(qtyInput)
+        if (isNaN(parsed) || parsed < 0) {
+            setQtyInput(displayQuantity.toString())
+        } else {
+            // Ensure store has the final value (though onChange usually handles it)
+            handleQuantityUpdate(parsed)
+            // Re-format to remove trailing dots/zeros if desired, or just leave as is until next sync
+        }
     }
 
     return (
@@ -77,7 +110,7 @@ function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice }) {
                         <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-zinc-500 border-zinc-200 dark:border-zinc-700">
                             {item.unit || "шт"}
                         </Badge>
-                        {isPackMode && (
+                        {isPackEligible && (
                             <span className="text-[10px] text-zinc-400">
                                 {itemsPerPack} шт/уп
                             </span>
@@ -97,45 +130,67 @@ function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice }) {
             <Separator className="bg-zinc-100 dark:bg-zinc-800" />
 
             {/* Middle Row: Controls */}
-            <div className="flex items-center justify-between gap-3">
-                {/* Quantity Stepper */}
-                <div className="flex flex-col gap-1">
-                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5 h-9 w-fit">
-                        <button
-                            className="w-8 h-full flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-50 transition-colors"
-                            onClick={() => handleQuantityUpdate(Math.max(1, displayQuantity - 1))}
-                            disabled={displayQuantity <= 1}
-                        >
-                            <Minus className="h-4 w-4" />
-                        </button>
-                        <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700" />
-                        <input
-                            className="w-12 bg-transparent text-center text-sm font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            value={displayQuantity}
-                            onChange={(e) => handleQuantityUpdate(parseFloat(e.target.value))}
-                            type="number"
-                        />
-                        <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700" />
-                        <button
-                            className="w-8 h-full flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
-                            onClick={() => handleQuantityUpdate(displayQuantity + 1)}
-                        >
-                            <Plus className="h-4 w-4" />
-                        </button>
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                    {/* Quantity Stepper */}
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5 h-9 w-fit">
+                            <button
+                                className="w-8 h-full flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-50 transition-colors"
+                                onClick={() => handleQuantityUpdate(Math.max(1, displayQuantity - 1))}
+                                disabled={displayQuantity <= 1}
+                            >
+                                <Minus className="h-4 w-4" />
+                            </button>
+                            <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700" />
+                            <input
+                                className="w-12 bg-transparent text-center text-sm font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                value={qtyInput}
+                                onChange={(e) => handleQuantityInputChange(e.target.value)}
+                                onBlur={handleQuantityInputBlur}
+                                onFocus={(e) => e.target.select()}
+                                type="number"
+                            />
+                            <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700" />
+                            <button
+                                className="w-8 h-full flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                                onClick={() => handleQuantityUpdate(displayQuantity + 1)}
+                            >
+                                <Plus className="h-4 w-4" />
+                            </button>
 
-                        {/* Unit Label Next to Input */}
-                        <div className="px-2 text-xs font-medium text-zinc-500 border-l border-zinc-200 dark:border-zinc-700 h-full flex items-center">
-                            {isPackMode ? "упак." : (item.unit || "шт.")}
+                            {/* Unit Label Next to Input */}
+                            <div className="px-2 text-xs font-medium text-zinc-500 border-l border-zinc-200 dark:border-zinc-700 h-full flex items-center">
+                                {isPackActive ? "упак." : (item.unit || "шт.")}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Helper Text for Packs */}
-                    {isPackMode && (
-                        <div className="text-[10px] text-zinc-400 pl-1">
-                            1 упак = {itemsPerPack} шт.
+                    {/* Pack Toggle Checkbox */}
+                    {isPackEligible && (
+                        <div className="flex items-center gap-2">
+                            <Checkbox
+                                id={`pack-toggle-${item.id}`}
+                                checked={isPackActive}
+                                onCheckedChange={() => togglePack(item.id)}
+                                className="w-4 h-4 border-zinc-300 dark:border-zinc-600 data-[state=checked]:bg-violet-500 data-[state=checked]:border-violet-500"
+                            />
+                            <label
+                                htmlFor={`pack-toggle-${item.id}`}
+                                className="text-xs font-medium text-zinc-600 dark:text-zinc-400 cursor-pointer select-none"
+                            >
+                                Продать упаковкой
+                            </label>
                         </div>
                     )}
                 </div>
+
+                {/* Helper Text for Packs */}
+                {isPackActive && (
+                    <div className="text-[10px] text-zinc-400 pl-1">
+                        1 упак = {itemsPerPack} шт. (Итого: {item.quantity} {item.unit || "шт"})
+                    </div>
+                )}
             </div>
 
             {/* Bottom Row: Financials */}
@@ -157,7 +212,7 @@ function CartItemRow({ item, updateCartItem, removeItem, updateItemPrice }) {
                 {/* Subtotal & Total */}
                 <div className="text-right">
                     <div className="text-[10px] text-zinc-400 font-medium mb-0.5">
-                        {item.quantity} шт × {item.sold_price || 0}
+                        {item.quantity} {item.unit || "шт"} × {item.sold_price || 0}
                     </div>
                     <div className="font-black text-violet-600 dark:text-violet-400 text-lg leading-none">
                         {totalRowPrice.toFixed(0)} <span className="text-xs font-bold opacity-70">c.</span>
@@ -219,18 +274,21 @@ export default function SalesPage() {
         p.name.toLowerCase().includes(search.toLowerCase())
     )
 
-const handleCheckout = async () => {
+    const handleCheckout = async () => {
         // 1. Запоминаем клиента ПЕРЕД тем, как стор очистится
         const currentClient = useCartStore.getState().selectedClient;
-        const clientName = currentClient ? currentClient.label : "Анонимный покупатель";
+        const clientName = currentClient
+            ? `${currentClient.full_name}${currentClient.phone ? ` (${currentClient.phone})` : ''}`
+            : "Анонимный покупатель";
 
         const result = await checkout(paidAmount || getTotal());
-        
+
         if (result.success) {
             // 2. Берем ответ от бэка, но если там нет имени клиента, вставляем наше
+            // Prioritize local client name if we have one, to avoid backend defaults overwriting it
             const saleData = {
                 ...result.data,
-                client_name: result.data.client_name || clientName
+                client_name: (currentClient ? clientName : result.data.client_name) || "Анонимный покупатель"
             };
 
             // 3. Сохраняем этот "полный" чек для диалога
@@ -568,7 +626,7 @@ function ForwardReceiptDialog({ receiptData, onClose }) {
             id: receiptData.id,
             date: new Date().toISOString(),
             // Logic: If client exists, use full_name, else "Анонимный покупатель"
-            client_name: receiptData.client ? receiptData.client.full_name : (selectedClient ? selectedClient.label : "Анонимный покупатель"),
+            client_name: receiptData.client_name || (receiptData.client ? receiptData.client.full_name : "Анонимный покупатель"),
             // Ensure total is a number
             total_amount: Number(receiptData.total_amount || receiptData.total || 0),
             items: (receiptData.items || []).map(item => ({

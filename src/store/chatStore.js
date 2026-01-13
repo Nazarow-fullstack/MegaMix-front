@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { useAuthStore } from './authStore';
 import api from '@/utils/axios';
+import { API_BASE_URL } from '@/utils/config';
 
 export const useChatStore = create((set, get) => ({
     socket: null,
+    reconnectTimeout: null,
     messages: [], // Array of message objects
     activeChat: 'general', // 'general' or userId
     onlineUsers: [], // List of online user IDs
@@ -17,13 +19,22 @@ export const useChatStore = create((set, get) => ({
 
         set({ isConnecting: true });
 
-        // WebSocket URL
-        const wsUrl = `ws://127.0.0.1:8000/api/chat/ws?token=${token}`;
+        // Dynamic WebSocket URL
+        const wsProtocol = API_BASE_URL.startsWith('https') ? 'wss' : 'ws';
+        const wsBase = API_BASE_URL.replace(/^https?:\/\//, '');
+        const wsUrl = `${wsProtocol}://${wsBase}/api/chat/ws?token=${token}`;
+
         const socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
             console.log("WS Connected");
             set({ isConnected: true, isConnecting: false });
+            // Clear any existing reconnect timeout if we engaged slightly before
+            const { reconnectTimeout } = get();
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                set({ reconnectTimeout: null });
+            }
         };
 
         socket.onmessage = (event) => {
@@ -33,17 +44,10 @@ export const useChatStore = create((set, get) => ({
                 // If it's a message, append to list
                 if (data.type === 'online_users') {
                     // Assuming backend might implement this
-                    // If data is just a message, we do this:
-                    // But if data contains type 'online_users', we handle it.
-                    // Since instructions were specific about messages, I'll focus on that.
-                    // But usually we receive a message object.
                 }
 
                 // Append message
                 const currentMessages = get().messages;
-                // Avoid duplicates if we were optimistic? 
-                // Simple append for now as requested.
-                // We assume `data` is the message object.
                 set({ messages: [...currentMessages, data] });
 
             } catch (e) {
@@ -53,23 +57,38 @@ export const useChatStore = create((set, get) => ({
 
         socket.onclose = () => {
             console.log("WS Disconnected");
-            set({ isConnected: false, isConnecting: false, socket: null });
+            set({ isConnected: false, isConnecting: false });
+
+            // Auto-reconnect if socket is not explicitly nulled (meaning we didn't call disconnect)
+            const { socket: currentSocket } = get();
+            if (currentSocket) {
+                console.log("Attempting to reconnect in 3s...");
+                const timeout = setTimeout(() => {
+                    get().connect();
+                }, 3000);
+                set({ reconnectTimeout: timeout });
+            }
         };
 
         socket.onerror = (e) => {
             console.error("WS Error", e);
-            set({ isConnected: false, isConnecting: false });
+            // onerror will usually be followed by onclose, so we handle logic there
         };
 
         set({ socket });
     },
 
     disconnect: () => {
-        const { socket } = get();
+        const { socket, reconnectTimeout } = get();
+        if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+        }
         if (socket) {
+            // Remove listener to prevent onclose firing reconnection logic
+            socket.onclose = null;
             socket.close();
         }
-        set({ socket: null, isConnected: false });
+        set({ socket: null, isConnected: false, reconnectTimeout: null });
     },
 
     setActiveChat: async (chatId) => {

@@ -442,15 +442,19 @@ function ReceiptBubble({ content, isMe }) {
                     const itemPrice = item.price || item.sold_price || 0;
 
                     return (
-                        <div key={i} className={classNames("text-xs flex justify-between gap-2", isMe ? "text-violet-50" : "text-zinc-600 dark:text-zinc-300")}>
-                            <span className="truncate flex-1">
-                                {typeof item === 'string' ? item : `${itemName} x${itemQty}`}
-                            </span>
-                            {typeof item !== 'string' && (
-                                <span className="whitespace-nowrap opacity-70 font-medium">
-                                    {(itemPrice * itemQty).toFixed(0)} c.
-                                </span>
-                            )}
+                        <div key={i} className={classNames("text-xs flex flex-col gap-1 border-b border-dashed border-white/10 pb-2 last:border-0", isMe ? "text-violet-50" : "text-zinc-600 dark:text-zinc-300")}>
+                            <div className="flex justify-between">
+                                <span className="opacity-70">Товар:</span>
+                                <span className="font-medium text-right truncate max-w-[140px]">{itemName}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="opacity-70">Количество:</span>
+                                <span className="font-medium">{itemQty} {item.unit || "шт"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="opacity-70">Цена:</span>
+                                <span className="font-medium">{(itemPrice * itemQty).toFixed(0)} c.</span>
+                            </div>
                         </div>
                     )
                 }) : (
