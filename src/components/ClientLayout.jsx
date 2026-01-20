@@ -59,10 +59,12 @@ export function ClientLayout({ children }) {
     }
 
     // Show loading spinner while checking auth status to prevent content flash
+    // Show loading spinner while checking auth status to prevent content flash
     if (isLoading || !isClientReady) {
         return (
-            <div className="flex h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-                <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
+            <div className="flex flex-col items-center justify-center h-screen w-full bg-zinc-50 dark:bg-zinc-950">
+                <Loader2 className="h-10 w-10 animate-spin text-violet-600 mb-4" />
+                <p className="text-zinc-500 font-medium animate-pulse">Загрузка системы...</p>
             </div>
         )
     }
