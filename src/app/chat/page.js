@@ -47,8 +47,8 @@ export default function ChatPage() {
     // Initial Data Fetch
     useEffect(() => {
         fetchUsers()
-        connect()
-    }, [fetchUsers, connect])
+        // connect() - Handled globally in ClientLayout
+    }, [fetchUsers]) // Removed connect dependency
 
     // Scroll to bottom
     useEffect(() => {
@@ -166,7 +166,8 @@ export default function ChatPage() {
                         </div>
 
                         {filteredUsers.map(u => {
-                            const isOnline = onlineUsers.includes(u.id)
+                            // Safe check handling String vs Number mismatch
+                            const isOnline = onlineUsers.map(id => String(id)).includes(String(u.id));
                             return (
                                 <button
                                     key={u.id}
@@ -245,7 +246,7 @@ export default function ChatPage() {
                                 {activeChat === 'general' ? 'Общий чат' : (activeChatUser?.username || "Loading...")}
                             </h2>
                             <p className="text-xs text-emerald-600 font-medium">
-                                {activeChat === 'general' ? `${onlineUsers.length} online` : (onlineUsers.includes(activeChat) ? "Online" : "Offline")}
+                                {activeChat === 'general' ? `${onlineUsers.length} online` : (onlineUsers.map(id => String(id)).includes(String(activeChat)) ? "Online" : "Offline")}
                             </p>
                         </div>
                     </div>
@@ -260,7 +261,7 @@ export default function ChatPage() {
                 <div className="flex-1 overflow-y-auto relative z-10 w-full">
                     <div className="p-4 space-y-4 min-h-full flex flex-col justify-end w-full">
                         {[...messages]
-                            .sort((a, b) => new Date(a.created_at || a.timestamp || 0) - new Date(b.created_at || b.timestamp || 0))
+                            .sort((a, b) => new Date(a.created_at || a.timestamp || 0).getTime() - new Date(b.created_at || b.timestamp || 0).getTime())
                             .map((msg, idx, arr) => {
                                 const isMe = msg.sender_id === currentUser?.id || msg.senderId === currentUser?.id || msg.sender === 'Me';
                                 const nextMsg = arr[idx + 1];

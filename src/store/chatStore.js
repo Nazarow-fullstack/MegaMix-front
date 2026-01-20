@@ -4,6 +4,14 @@ import api from '@/utils/axios';
 import { API_BASE_URL } from '@/utils/config';
 import { toast } from 'sonner';
 
+const sortMessages = (msgs) => {
+    return [...msgs].sort((a, b) => {
+        const tA = new Date(a.created_at || a.timestamp || 0).getTime();
+        const tB = new Date(b.created_at || b.timestamp || 0).getTime();
+        return tA - tB; // Oldest first, Newest last
+    });
+};
+
 export const useChatStore = create((set, get) => ({
     socket: null,
     reconnectTimeout: null,
@@ -44,28 +52,54 @@ export const useChatStore = create((set, get) => ({
 
                 // Handle Online Users Update
                 if (data.type === 'online_users') {
+                    console.log("🔥 ONLINE USERS UPDATE:", data.users); // Debug log
                     set({ onlineUsers: data.users || [] });
                     return;
                 }
 
                 // Handle Incoming Message
                 const currentMessages = get().messages;
+                const newMessage = data;
 
-                // Avoid duplicates if needed, but for now just appending
-                set({ messages: [...currentMessages, data] });
+                // Deduplicate: Remove the temporary message if it matches the new real one
+                const { user: me } = useAuthStore.getState();
+                const isMyMessage = (data.sender_id || data.senderId) === me?.id;
+
+                let filteredMessages = currentMessages;
+                if (isMyMessage) {
+                    // Find and remove the first matching temp message
+                    // Match by content and message type
+                    const tempIndex = currentMessages.findIndex(m =>
+                        m.isTemp && m.content === data.content && m.msg_type === (data.msg_type || data.type)
+                    );
+
+                    if (tempIndex !== -1) {
+                        filteredMessages = [...currentMessages];
+                        filteredMessages.splice(tempIndex, 1);
+                    }
+                }
+
+                // Strictly Sort messages by time (Oldest -> Newest)
+                const updatedMessages = sortMessages([...filteredMessages, newMessage]);
+
+                set({ messages: updatedMessages });
 
                 // Notification Logic
                 const { activeChat } = get();
                 const { user: currentUser } = useAuthStore.getState();
 
                 // Check if message is from someone else AND not in the active chat
-                // Data structure assumption: data.sender_id or data.senderId
                 const senderId = data.sender_id || data.senderId;
 
                 if (senderId && currentUser && senderId !== currentUser.id) {
-                    // Start sound effect if wanted (optional)
+                    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
 
-                    if (Number(senderId) !== Number(activeChat)) {
+                    // Show notification if NOT on chat page OR if on chat page but in different chat
+                    const isChatPage = currentPath === '/chat';
+                    const isDifferentChat = Number(senderId) !== Number(activeChat);
+
+                    if (!isChatPage || (isChatPage && isDifferentChat)) {
+                        // Play sound if needed (optional)
                         toast.info(`New message from ${data.sender_name || 'User'}`);
                     }
                 }
@@ -125,7 +159,7 @@ export const useChatStore = create((set, get) => ({
             }
 
             const res = await api.get('/api/chat/history', { params });
-            set({ messages: res.data });
+            set({ messages: sortMessages(res.data) });
         } catch (error) {
             console.error("Failed to fetch history", error);
         } finally {
@@ -142,15 +176,29 @@ export const useChatStore = create((set, get) => ({
         }
 
         const recipientId = activeChat === 'general' ? null : activeChat;
+        const currentUser = useAuthStore.getState().user;
+
+        // Optimistic Update
+        const tempMsg = {
+            id: Date.now(), // Temporary ID
+            content,
+            msg_type: type,
+            sender_id: currentUser?.id,
+            sender_name: "Me", // Or currentUser?.full_name
+            created_at: new Date().toISOString(), // Use LOCAL time immediately
+            isTemp: true
+        };
+
+        const currentMessages = get().messages;
+        const updatedMessages = sortMessages([...currentMessages, tempMsg]);
+
+        set({ messages: updatedMessages });
 
         const payload = {
             content,
-            msg_type: type, // Backend expects snake_case probably? User said msg_type
+            msg_type: type,
             recipient_id: recipientId
         };
-
-        // Ensure recipient_id is integer if needed, or null
-        // payload format requested: { content: "...", msg_type: "...", recipient_id: ... }
 
         socket.send(JSON.stringify(payload));
     },

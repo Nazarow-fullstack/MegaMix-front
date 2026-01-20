@@ -20,8 +20,8 @@ import { cn } from "@/lib/utils"
 
 const menuItems = [
     { href: "/sales", label: "Касса", icon: DollarSign, roles: ["admin", "manager"] },
-    { href: "/inventory", label: "Склад", icon: Boxes, roles: ["admin", "manager", "worker"] },
-    { href: "/clients", label: "Клиенты", icon: Users, roles: ["admin", "manager", "worker"] },
+    { href: "/inventory", label: "Склад", icon: Boxes, roles: ["admin"] },
+    { href: "/clients", label: "Клиенты", icon: Users, roles: ["admin", "manager"] },
     { href: "/analytics", label: "Аналитика", icon: BarChart3, roles: ["admin", "manager"] },
     { href: "/expenses", label: "Расходы", icon: Briefcase, roles: ["admin", "manager"] },
     { href: "/users", label: "Сотрудники", icon: Baby, roles: ["admin"] },
@@ -30,7 +30,11 @@ const menuItems = [
 
 export function Sidebar({ setOpen }) {
     const pathname = usePathname()
-    const { logout } = useAuthStore()
+    const { logout, user } = useAuthStore()
+
+    const userRole = user?.role?.toLowerCase() || 'worker'; // Default to restricted if unknown
+
+    const filteredItems = menuItems.filter(item => item.roles.includes(userRole));
 
     return (
         <div className="flex h-full flex-col justify-between border-r border-violet-700 bg-gradient-to-b from-violet-800 to-violet-950 text-white">
@@ -41,7 +45,7 @@ export function Sidebar({ setOpen }) {
                     </h2>
                 </div>
                 <nav className="flex flex-col gap-2 px-3">
-                    {menuItems.map((item) => {
+                    {filteredItems.map((item) => {
                         const isActive = pathname === item.href
                         return (
                             <Link
