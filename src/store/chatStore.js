@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { useAuthStore } from './authStore';
 import api from '@/utils/axios';
 import { API_BASE_URL } from '@/utils/config';
+import { toast } from 'sonner';
 
 export const useChatStore = create((set, get) => ({
     socket: null,
@@ -41,14 +42,33 @@ export const useChatStore = create((set, get) => ({
             try {
                 const data = JSON.parse(event.data);
 
-                // If it's a message, append to list
+                // Handle Online Users Update
                 if (data.type === 'online_users') {
-                    // Assuming backend might implement this
+                    set({ onlineUsers: data.users || [] });
+                    return;
                 }
 
-                // Append message
+                // Handle Incoming Message
                 const currentMessages = get().messages;
+
+                // Avoid duplicates if needed, but for now just appending
                 set({ messages: [...currentMessages, data] });
+
+                // Notification Logic
+                const { activeChat } = get();
+                const { user: currentUser } = useAuthStore.getState();
+
+                // Check if message is from someone else AND not in the active chat
+                // Data structure assumption: data.sender_id or data.senderId
+                const senderId = data.sender_id || data.senderId;
+
+                if (senderId && currentUser && senderId !== currentUser.id) {
+                    // Start sound effect if wanted (optional)
+
+                    if (Number(senderId) !== Number(activeChat)) {
+                        toast.info(`New message from ${data.sender_name || 'User'}`);
+                    }
+                }
 
             } catch (e) {
                 console.error("WS Message Error", e);

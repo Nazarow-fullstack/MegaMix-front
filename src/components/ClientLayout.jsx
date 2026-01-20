@@ -8,7 +8,8 @@ import { Menu, Loader2 } from "lucide-react"
 import { Sidebar } from "@/components/Sidebar"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
-import { replace } from "lucide-react" // This line seems to be an error in my thought process, ignoring. 
+import { replace } from "lucide-react"
+import { Toaster } from "sonner" // This line seems to be an error in my thought process, ignoring. 
 import { useAuthStore } from "@/store/authStore"
 import { useChatStore } from "@/store/chatStore"
 
@@ -112,6 +113,7 @@ export function ClientLayout({ children }) {
                     </motion.div>
                 </main>
             </div>
+            <Toaster richColors closeButton />
         </div>
     )
 }

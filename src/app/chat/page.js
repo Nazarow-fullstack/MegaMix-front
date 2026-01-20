@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar" // We need to check if these exist, if not I'll use standard img/div
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
@@ -104,13 +104,14 @@ export default function ChatPage() {
         : users.find(u => u.id === activeChat) || { username: "Unknown", id: activeChat }
 
     return (
-        <div className="flex h-[calc(100vh-4rem)] bg-zinc-50 dark:bg-zinc-950 overflow-hidden relative">
+        <div className="flex h-[calc(100dvh-1rem)] lg:h-[calc(100dvh-2rem)] overflow-hidden bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm my-2 mx-2 lg:mx-4 relative">
 
             {/* SIDEBAR - USERS */}
-            <div className={`
-                w-full md:w-80 lg:w-96 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 z-20 absolute md:relative h-full transition-transform duration-300
-                ${isMobileChatOpen ? '-translate-x-full md:translate-x-0' : 'translate-x-0'}
-            `}>
+            <div className={cn(
+                "flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 transition-all duration-300",
+                // Conditional Layout Logic
+                isMobileChatOpen ? "hidden md:flex md:w-80 md:relative" : "flex w-full md:w-80 md:relative"
+            )}>
                 <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
                     <h1 className="text-xl font-bold mb-4 text-zinc-900 dark:text-white">Сообщения</h1>
                     <div className="relative">
@@ -212,16 +213,20 @@ export default function ChatPage() {
                 </div>
             </div>
 
-            {/* CHAT AREA */}
-            <div className={`
-                flex-1 flex flex-col bg-[url('https://cdn.dribbble.com/users/1210336/screenshots/2787834/media/5e8e84a2ca10298a09f874c7c89fa888.jpg')] bg-fixed bg-cover z-10 w-full absolute md:relative h-full transition-transform duration-300
-                ${isMobileChatOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
-            `}>
-                {/* Overlay for readability if bg is loud */}
-                <div className="absolute inset-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-sm z-0" />
+            {/* CHAT WINDOW */}
+            <div className={cn(
+                "flex-col h-full bg-zinc-50/50 dark:bg-zinc-900/50 relative overflow-hidden",
+                // Conditional Layout Logic
+                isMobileChatOpen
+                    ? "flex fixed inset-0 z-50 bg-background md:relative md:flex-1 md:z-0"
+                    : "hidden md:flex md:flex-1"
+            )}>
 
-                {/* Chat Header */}
-                <div className="relative z-10 h-16 border-b border-zinc-200/50 dark:border-zinc-800/50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex items-center justify-between px-4">
+                {/* Background Pattern */}
+                <div className="absolute inset-0 bg-[url('https://cdn.dribbble.com/users/1210336/screenshots/2787834/media/5e8e84a2ca10298a09f874c7c89fa888.jpg')] bg-fixed bg-cover opacity-5 dark:opacity-[0.02] pointer-events-none" />
+
+                {/* 1. STICKY HEADER */}
+                <div className="h-16 flex-none border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur flex items-center px-4 justify-between z-20 relative">
                     <div className="flex items-center gap-3">
                         <Button
                             variant="ghost"
@@ -251,14 +256,14 @@ export default function ChatPage() {
                     </div>
                 </div>
 
-                {/* Messages List */}
-                <div className="relative z-10 flex-1 overflow-hidden">
-                    <ScrollArea className="h-full p-4">
-                        <div className="space-y-4 pb-4">
-                            {[...messages].reverse().map((msg, idx) => {
+                {/* 2. SCROLLABLE MESSAGES */}
+                <div className="flex-1 overflow-y-auto relative z-10 w-full">
+                    <div className="p-4 space-y-4 min-h-full flex flex-col justify-end w-full">
+                        {[...messages]
+                            .sort((a, b) => new Date(a.created_at || a.timestamp || 0) - new Date(b.created_at || b.timestamp || 0))
+                            .map((msg, idx, arr) => {
                                 const isMe = msg.sender_id === currentUser?.id || msg.senderId === currentUser?.id || msg.sender === 'Me';
-                                // Simple chain detection
-                                const nextMsg = messages[idx + 1];
+                                const nextMsg = arr[idx + 1];
                                 const isStats = nextMsg && nextMsg.senderId === msg.senderId;
 
                                 return (
@@ -271,7 +276,7 @@ export default function ChatPage() {
                                     >
                                         {/* Avatar for Others */}
                                         {!isMe && (
-                                            <Avatar className="h-8 w-8 mt-1 border border-zinc-200 dark:border-zinc-800">
+                                            <Avatar className="h-8 w-8 mt-1 border border-zinc-200 dark:border-zinc-800 flex-shrink-0">
                                                 <AvatarFallback className="bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-xs">
                                                     {(msg.sender_name || msg.sender || "?")[0]?.toUpperCase()}
                                                 </AvatarFallback>
@@ -298,7 +303,7 @@ export default function ChatPage() {
                                                     const type = (msg.msg_type || msg.type || 'TEXT').toUpperCase();
 
                                                     if (type === 'TEXT') return (
-                                                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                                                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
                                                     );
 
                                                     if (type === 'IMAGE') return (
@@ -331,13 +336,12 @@ export default function ChatPage() {
                                     </div>
                                 )
                             })}
-                            <div ref={scrollRef} />
-                        </div>
-                    </ScrollArea>
+                        <div ref={scrollRef} />
+                    </div>
                 </div>
 
-                {/* Input Area */}
-                <div className="relative z-10 p-3 md:p-4 bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800">
+                {/* 3. STICKY INPUT */}
+                <div className="flex-none p-3 pb-safe bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 relative z-20">
                     {previewImage && (
                         <div className="absolute bottom-full left-0 m-4 p-2 bg-white dark:bg-zinc-900 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
                             <img src={previewImage.url} className="w-16 h-16 object-cover rounded-md" alt="Preview" />
@@ -351,7 +355,7 @@ export default function ChatPage() {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-10 w-10 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-xl"
+                            className="h-10 w-10 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-xl flex-shrink-0"
                             onClick={() => document.getElementById('chat-upload').click()}
                         >
                             <Paperclip className="w-5 h-5" />
@@ -369,7 +373,7 @@ export default function ChatPage() {
 
                         <Button
                             className={classNames(
-                                "h-10 w-10 rounded-xl shadow-lg transition-all",
+                                "h-10 w-10 rounded-xl shadow-lg transition-all flex-shrink-0",
                                 msgInput.trim() || previewImage
                                     ? "bg-violet-600 hover:bg-violet-700 text-white scale-100"
                                     : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 scale-95 opacity-50"
