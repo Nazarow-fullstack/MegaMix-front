@@ -411,7 +411,7 @@ export default function InventoryPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="unit">Ед. изм.</Label>
-                                    <Select name="unit" defaultValue="шт">
+                                    <Select name="unit" defaultValue="штук">
                                         <SelectTrigger className="bg-zinc-50 dark:bg-zinc-900">
                                             <SelectValue placeholder="Unit" />
                                         </SelectTrigger>
