@@ -416,10 +416,10 @@ export default function InventoryPage() {
                                             <SelectValue placeholder="Unit" />
                                         </SelectTrigger>
                                         <SelectContent className="bg-white dark:bg-zinc-950 z-[200]">
-                                            <SelectItem value="шт">шт</SelectItem>
-                                            <SelectItem value="кг">кг</SelectItem>
-                                            <SelectItem value="л">л</SelectItem>
-                                            <SelectItem value="м">м</SelectItem>
+                                            <SelectItem value="шт">штук</SelectItem>
+                                            <SelectItem value="кг">килограмм</SelectItem>
+                                            <SelectItem value="л">упаковка</SelectItem>
+                                            <SelectItem value="м">метр</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
