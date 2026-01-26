@@ -416,10 +416,10 @@ export default function InventoryPage() {
                                             <SelectValue placeholder="Unit" />
                                         </SelectTrigger>
                                         <SelectContent className="bg-white dark:bg-zinc-950 z-[200]">
-                                            <SelectItem value="шт">штук</SelectItem>
-                                            <SelectItem value="кг">килограмм</SelectItem>
-                                            <SelectItem value="л">упаковка</SelectItem>
-                                            <SelectItem value="м">метр</SelectItem>
+                                            <SelectItem value="штук">штук</SelectItem>
+                                            <SelectItem value="килограмм">килограмм</SelectItem>
+                                            <SelectItem value="упаковка">упаковка</SelectItem>
+                                            <SelectItem value="метр">метр</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -571,10 +571,10 @@ export default function InventoryPage() {
                                                 <SelectValue placeholder="Unit" />
                                             </SelectTrigger>
                                             <SelectContent className="bg-white dark:bg-zinc-950 z-[200]">
-                                                <SelectItem value="шт">штук</SelectItem>
-                                                <SelectItem value="кг">килограм</SelectItem>
-                                                <SelectItem value="л">упаковка</SelectItem>
-                                                <SelectItem value="м">метр</SelectItem>
+                                                <SelectItem value="штук">штук</SelectItem>
+                                                <SelectItem value="килограмм">килограмм</SelectItem>
+                                                <SelectItem value="упаковка">упаковка</SelectItem>
+                                                <SelectItem value="метр">метр</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
