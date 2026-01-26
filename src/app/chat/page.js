@@ -156,7 +156,7 @@ export default function ChatPage() {
                                     <span className="text-[10px] text-zinc-400">12:30</span>
                                 </div>
                                 <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
-                                    System: Welcome to the Team Chat!
+                                    Система: Добро пожаловать в командный чат!
                                 </p>
                             </div>
                         </button>
@@ -200,7 +200,7 @@ export default function ChatPage() {
                                             </span>
                                         </div>
                                         <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
-                                            Click to start chatting
+                                            Нажмите, чтобы начать чат
                                         </p>
                                     </div>
                                 </button>
@@ -402,7 +402,7 @@ function ReceiptBubble({ content, isMe }) {
         if (typeof data === 'string') data = JSON.parse(data);
     } catch (e) {
         console.error("JSON Parse Error:", e);
-        return <p className="text-red-500 text-xs p-2">Invalid Receipt Data</p>;
+        return <p className="text-red-500 text-xs p-2">Неверные данные чека</p>;
     }
 
     // Standardize data consumption (handle multiple possible legacy formats)

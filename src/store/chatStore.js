@@ -52,7 +52,7 @@ export const useChatStore = create((set, get) => ({
 
                 // Handle Online Users Update
                 if (data.type === 'online_users') {
-                    console.log("🔥 ONLINE USERS UPDATE:", data.users); // Debug log
+                    console.log("🔥 ОБНОВЛЕНИЕ ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ИНТЕРНЕТА:", data.users); // Debug log
                     set({ onlineUsers: data.users || [] });
                     return;
                 }
@@ -100,23 +100,23 @@ export const useChatStore = create((set, get) => ({
 
                     if (!isChatPage || (isChatPage && isDifferentChat)) {
                         // Play sound if needed (optional)
-                        toast.info(`New message from ${data.sender_name || 'User'}`);
+                        toast.info(`Новое сообщение от ${data.sender_name || 'User'}`);
                     }
                 }
 
             } catch (e) {
-                console.error("WS Message Error", e);
+                console.error("Ошибка сообщения WS", e);
             }
         };
 
         socket.onclose = () => {
-            console.log("WS Disconnected");
+            console.log("WS отключен");
             set({ isConnected: false, isConnecting: false });
 
             // Auto-reconnect if socket is not explicitly nulled (meaning we didn't call disconnect)
             const { socket: currentSocket } = get();
             if (currentSocket) {
-                console.log("Attempting to reconnect in 3s...");
+                console.log("Попытка восстановить связь в 3s...");
                 const timeout = setTimeout(() => {
                     get().connect();
                 }, 3000);
@@ -125,7 +125,7 @@ export const useChatStore = create((set, get) => ({
         };
 
         socket.onerror = (e) => {
-            console.error("WS Error", e);
+            console.error("Ошибка WS", e);
             // onerror will usually be followed by onclose, so we handle logic there
         };
 
@@ -161,7 +161,7 @@ export const useChatStore = create((set, get) => ({
             const res = await api.get('/api/chat/history', { params });
             set({ messages: sortMessages(res.data) });
         } catch (error) {
-            console.error("Failed to fetch history", error);
+            console.error("Не удалось получить историю.", error);
         } finally {
             set({ isLoading: false });
         }
@@ -171,7 +171,7 @@ export const useChatStore = create((set, get) => ({
         const { socket, activeChat } = get();
 
         if (!socket || socket.readyState !== WebSocket.OPEN) {
-            console.error("Socket not connected");
+            console.error("Розетка не подключена");
             return;
         }
 
@@ -216,7 +216,7 @@ export const useChatStore = create((set, get) => ({
 
             return response.data.url; // Assuming backend returns { url: "/static/..." }
         } catch (error) {
-            console.error("Failed to upload image", error);
+            console.error("Не удалось загрузить изображение.", error);
             return null;
         }
     }
